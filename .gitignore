@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+
+# Ambiente e configurações locais
+.env
+.env.*
+!.env.example
+
+# Logs, dados e banco local
+*.sqlite
+*.db
+*.csv
+logs/
+data/
+
+# Firmware compilado
+build/
+*.elf
+*.bin
+*.hex
+
+# Sistema e editor
+.DS_Store
+.vscode/settings.json
+.idea/
