@@ -24,12 +24,16 @@ function limitar(valor, minimo, maximo) {
 
 function criarTelemetriaAnterior() {
   return {
+    time: new Date().toLocaleTimeString(),
+
     rpm: 900,
     map_kpa: 100,
     lambda1: 1.0,
+
     tps: 0,
     ect_c: 85,
     iat_c: 28,
+
     battery_v: 13.8,
     oil_bar: 4.0,
     fuel_bar: 3.1,
@@ -37,47 +41,87 @@ function criarTelemetriaAnterior() {
 }
 
 function gerarTelemetria(anterior = criarTelemetriaAnterior()) {
-  const rpm = limitar(
-    anterior.rpm + (Math.random() - 0.5) * 280,
-    750,
-    6500
-  );
+  const rpm = limitar(anterior.rpm + (Math.random() - 0.5) * 280, 750, 6500);
 
   const mapKpa = limitar(
     anterior.map_kpa + (Math.random() - 0.5) * 12,
     30,
-    220
+    220,
   );
 
-  const tps = limitar(
-    anterior.tps + (Math.random() - 0.5) * 12,
-    0,
-    100
-  );
+  const tps = limitar(anterior.tps + (Math.random() - 0.5) * 12, 0, 100);
 
   return {
     time: new Date().toLocaleTimeString(),
 
     rpm: Math.round(rpm),
+
     map_kpa: Math.round(mapKpa),
+
     lambda1: Number((1 + (Math.random() - 0.5) * 0.04).toFixed(2)),
 
     tps: Math.round(tps),
-    ect_c: Math.round(limitar(anterior.ect_c + (Math.random() - 0.5) * 2, 75, 110)),
-    iat_c: Math.round(limitar(anterior.iat_c + (Math.random() - 0.5) * 2, 20, 55)),
+
+    ect_c: Math.round(
+      limitar(anterior.ect_c + (Math.random() - 0.5) * 2, 75, 110),
+    ),
+
+    iat_c: Math.round(
+      limitar(anterior.iat_c + (Math.random() - 0.5) * 2, 20, 55),
+    ),
 
     battery_v: Number(
-      limitar(anterior.battery_v + (Math.random() - 0.5) * 0.15, 12, 14.8).toFixed(1)
+      limitar(
+        anterior.battery_v + (Math.random() - 0.5) * 0.15,
+        12,
+        14.8,
+      ).toFixed(1),
     ),
 
     oil_bar: Number(
-      limitar(anterior.oil_bar + (Math.random() - 0.5) * 0.3, 0.5, 6).toFixed(1)
+      limitar(anterior.oil_bar + (Math.random() - 0.5) * 0.3, 0.5, 6).toFixed(
+        1,
+      ),
     ),
 
     fuel_bar: Number(
-      limitar(anterior.fuel_bar + (Math.random() - 0.5) * 0.2, 1, 5).toFixed(1)
+      limitar(anterior.fuel_bar + (Math.random() - 0.5) * 0.2, 1, 5).toFixed(1),
     ),
   };
+}
+
+function aplicarModoSimulacao(ponto, anterior, modo) {
+  const resultado = { ...ponto };
+
+  switch (modo) {
+    case "temperature":
+      resultado.ect_c = Math.min(anterior.ect_c + 2, 115);
+      break;
+
+    case "battery":
+      resultado.battery_v = Number(
+        Math.max(anterior.battery_v - 0.2, 10.5).toFixed(1),
+      );
+      break;
+
+    case "oil":
+      resultado.oil_bar = Number(
+        Math.max(anterior.oil_bar - 0.3, 0.3).toFixed(1),
+      );
+      break;
+
+    case "fuel":
+      resultado.fuel_bar = Number(
+        Math.max(anterior.fuel_bar - 0.2, 0.8).toFixed(1),
+      );
+      break;
+
+    case "normal":
+    default:
+      break;
+  }
+
+  return resultado;
 }
 
 function Card({ title, value }) {
@@ -90,31 +134,32 @@ function Card({ title, value }) {
 }
 
 function App() {
-  const [telemetry, setTelemetry] = useState(() => [gerarTelemetria()]);
+  const [simulationMode, setSimulationMode] = useState("normal");
 
-  const [testeAlarme, setTesteAlarme] = useState(false);
+  const [telemetry, setTelemetry] = useState(() => [criarTelemetriaAnterior()]);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTelemetry((previous) => {
         const lastPoint = previous.at(-1) || criarTelemetriaAnterior();
-        let nextPoint = gerarTelemetria(lastPoint);
 
-        if (testeAlarme) {
-          nextPoint = {
-            ...nextPoint,
-            ect_c: Math.min(lastPoint.ect_c + 2, 115),
-          };
-        }
+        const generatedPoint = gerarTelemetria(lastPoint);
+
+        const nextPoint = aplicarModoSimulacao(
+          generatedPoint,
+          lastPoint,
+          simulationMode,
+        );
 
         return [...previous.slice(-(MAX_POINTS - 1)), nextPoint];
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [testeAlarme]);
+  }, [simulationMode]);
 
   const current = telemetry.at(-1) || criarTelemetriaAnterior();
+
   const alarms = avaliarAlarmes(current);
 
   return (
@@ -129,19 +174,30 @@ function App() {
       <AlarmBanner alarms={alarms} />
 
       <div className="simulation-controls">
-        <button
-          onClick={() => setTesteAlarme((valor) => !valor)}
-          className={testeAlarme ? "active" : ""}
+        <label htmlFor="simulation-mode">TESTE DE SIMULAÇÃO</label>
+
+        <select
+          id="simulation-mode"
+          value={simulationMode}
+          onChange={(event) => setSimulationMode(event.target.value)}
         >
-          {testeAlarme
-            ? "Parar teste de temperatura"
-            : "Testar aumento de temperatura"}
-        </button>
+          <option value="normal">Operação normal</option>
+
+          <option value="temperature">Aumentar temperatura</option>
+
+          <option value="battery">Reduzir bateria</option>
+
+          <option value="oil">Reduzir pressão de óleo</option>
+
+          <option value="fuel">Reduzir pressão de combustível</option>
+        </select>
       </div>
 
       <section className="cards">
         <Card title="RPM" value={current.rpm} />
+
         <Card title="MAP" value={`${current.map_kpa} kPa`} />
+
         <Card title="Lambda" value={current.lambda1.toFixed(2)} />
       </section>
 
@@ -157,6 +213,7 @@ function App() {
             <YAxis yAxisId="map" orientation="right" domain={[0, 250]} hide />
 
             <Tooltip />
+
             <Legend />
 
             <Line
@@ -184,10 +241,15 @@ function App() {
 
       <section className="secondary-cards">
         <Card title="TPS" value={`${current.tps} %`} />
+
         <Card title="ECT" value={`${current.ect_c} °C`} />
+
         <Card title="IAT" value={`${current.iat_c} °C`} />
+
         <Card title="Bateria" value={`${current.battery_v} V`} />
+
         <Card title="Óleo" value={`${current.oil_bar} bar`} />
+
         <Card title="Combustível" value={`${current.fuel_bar} bar`} />
       </section>
     </main>

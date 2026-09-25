@@ -3,13 +3,11 @@
 :root {
   --bg: #080a0d;
   --panel: #101419;
-  --panel-2: #151b22;
   --line: #2a343e;
   --text: #f4f7fa;
   --muted: #8c9aa7;
 
   --red: #f11631;
-  --red-dark: #8a0e1e;
   --blue: #00a8ff;
   --green: #00e676;
   --yellow: #ffd600;
@@ -20,13 +18,18 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
 html {
   background: var(--bg);
 }
 
 body {
-  margin: 0;
-  min-width: 320px;
   color: var(--text);
   background:
     radial-gradient(circle at 50% -20%, #26313b 0%, transparent 35%),
@@ -51,12 +54,9 @@ main {
   position: relative;
   width: calc(100% - 48px);
   max-width: 1280px;
-  height: calc(100vh - 48px);
+  min-height: calc(100vh - 48px);
   margin: 24px auto;
-
-  /* Permite rolagem vertical dentro do painel */
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
 
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -73,6 +73,7 @@ main {
 
 main::before {
   position: absolute;
+  z-index: 2;
   top: 0;
   left: 0;
   width: 100%;
@@ -90,7 +91,7 @@ main::before {
 h1 {
   margin: 0;
   padding: 28px 30px 12px;
-  color: #ffffff;
+  color: #fff;
   font-family: "Barlow Condensed", Arial, sans-serif;
   font-size: clamp(2rem, 5vw, 3.4rem);
   font-weight: 800;
@@ -113,7 +114,7 @@ h1::after {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 30px 22px;
+  margin: 0 30px 18px;
   color: var(--muted);
   font-size: 0.94rem;
   font-weight: 600;
@@ -124,6 +125,7 @@ h1::after {
 .led {
   width: 10px;
   height: 10px;
+  flex: 0 0 10px;
   border: 1px solid #68ffac;
   border-radius: 50%;
   background: var(--green);
@@ -147,17 +149,51 @@ h1::after {
   }
 }
 
+/* Controles da simulação */
+.simulation-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px 16px;
+}
+
+.simulation-controls label {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.simulation-controls select {
+  min-width: 240px;
+  padding: 8px 12px;
+  border: 1px solid #3d4b57;
+  border-radius: 5px;
+  outline: none;
+  color: #e5edf4;
+  background: #17212a;
+  cursor: pointer;
+  font-family: "Rajdhani", Arial, sans-serif;
+  font-weight: 700;
+}
+
+.simulation-controls select:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 10px rgba(0, 168, 255, 0.25);
+}
+
+/* Cards principais */
 .cards {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: 14px;
-  padding: 0 30px 24px;
+  gap: 8px;
+  padding: 0 18px 16px;
 }
 
 .card {
   position: relative;
-  min-height: 130px;
-  padding: 16px 19px;
+  min-height: 96px;
+  padding: 10px 13px;
   overflow: hidden;
   border: 1px solid #303b46;
   border-radius: 8px;
@@ -183,42 +219,39 @@ h1::after {
 .card span {
   display: block;
   color: #b8c3cd;
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .card strong {
-  display: block;
   position: relative;
   z-index: 1;
-  margin-top: 7px;
+  display: block;
+  margin-top: 5px;
   color: #fff;
   font-family: "Barlow Condensed", Arial, sans-serif;
-  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-size: clamp(2rem, 4.5vw, 3.8rem);
   font-weight: 800;
   line-height: 0.9;
   letter-spacing: 0.015em;
   text-shadow: 0 0 12px rgba(255, 255, 255, 0.14);
 }
 
-/* RPM: indicador principal */
-.card:first-child {
+/* RPM */
+.cards .card:nth-child(1) {
   border-color: rgba(241, 22, 49, 0.65);
   background:
     linear-gradient(110deg, rgba(241, 22, 49, 0.16), transparent 48%),
     linear-gradient(180deg, #21141a, #120d10);
-  box-shadow:
-    inset 0 1px rgba(255, 255, 255, 0.08),
-    0 0 22px rgba(241, 22, 49, 0.09);
 }
 
-.card:first-child span {
+.cards .card:nth-child(1) span {
   color: #ff8594;
 }
 
-.card:first-child strong {
+.cards .card:nth-child(1) strong {
   color: var(--red);
   text-shadow:
     0 0 8px rgba(241, 22, 49, 0.85),
@@ -226,44 +259,45 @@ h1::after {
 }
 
 /* MAP */
-.card:nth-child(2) {
+.cards .card:nth-child(2) {
   border-color: rgba(0, 168, 255, 0.58);
   background:
     linear-gradient(110deg, rgba(0, 168, 255, 0.15), transparent 48%),
     linear-gradient(180deg, #101c27, #0c1117);
 }
 
-.card:nth-child(2) span {
+.cards .card:nth-child(2) span {
   color: #70cfff;
 }
 
-.card:nth-child(2) strong {
+.cards .card:nth-child(2) strong {
   color: var(--blue);
   text-shadow: 0 0 16px rgba(0, 168, 255, 0.45);
 }
 
 /* Lambda */
-.card:nth-child(3) {
+.cards .card:nth-child(3) {
   border-color: rgba(0, 230, 118, 0.52);
   background:
     linear-gradient(110deg, rgba(0, 230, 118, 0.12), transparent 48%),
     linear-gradient(180deg, #10221a, #0c1510);
 }
 
-.card:nth-child(3) span {
+.cards .card:nth-child(3) span {
   color: #74f6ae;
 }
 
-.card:nth-child(3) strong {
+.cards .card:nth-child(3) strong {
   color: var(--green);
   text-shadow: 0 0 16px rgba(0, 230, 118, 0.43);
 }
 
+/* Gráfico */
 .chart-box {
   position: relative;
-  height: 400px;
-  margin: 0 30px 30px;
-  padding: 18px 18px 7px;
+  height: 330px;
+  margin: 0 18px 18px;
+  padding: 18px 10px 5px;
   overflow: hidden;
   border: 1px solid #2f3b45;
   border-radius: 8px;
@@ -287,7 +321,6 @@ h1::after {
   letter-spacing: 0.16em;
 }
 
-/* Customiza o gráfico gerado pelo Recharts */
 .recharts-cartesian-grid line {
   stroke: #27313a !important;
   stroke-dasharray: 2 5;
@@ -322,7 +355,69 @@ h1::after {
   font-weight: 600 !important;
 }
 
-/* Scrollbar discreta */
+/* Cards secundários */
+.secondary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 18px 20px;
+}
+
+.secondary-cards .card {
+  min-height: 78px;
+}
+
+.secondary-cards .card strong {
+  font-size: clamp(1.7rem, 3vw, 2.8rem);
+}
+
+/* Alarmes */
+.alarm-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 18px 14px;
+}
+
+.alarm-banner {
+  padding: 9px 12px;
+  border: 1px solid;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.alarm-ok {
+  border-color: rgba(0, 230, 118, 0.45);
+  color: var(--green);
+  background: rgba(0, 230, 118, 0.08);
+}
+
+.alarm-alerta {
+  border-color: rgba(255, 214, 0, 0.65);
+  color: var(--yellow);
+  background: rgba(255, 214, 0, 0.1);
+}
+
+.alarm-critico {
+  border-color: rgba(241, 22, 49, 0.8);
+  color: #ff7180;
+  background: rgba(241, 22, 49, 0.14);
+  animation: alarm-pulse 1s infinite alternate;
+}
+
+@keyframes alarm-pulse {
+  from {
+    box-shadow: 0 0 3px rgba(241, 22, 49, 0.25);
+  }
+
+  to {
+    box-shadow: 0 0 18px rgba(241, 22, 49, 0.65);
+  }
+}
+
+/* Barra de rolagem em desktop */
 main::-webkit-scrollbar {
   width: 10px;
 }
@@ -343,13 +438,27 @@ main::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--red), #a70f23);
 }
 
-/* Tablet em pé e celular */
-@media (max-width: 1024px),
-(orientation: portrait) {
+/* Tablet */
+@media (min-width: 601px) and (max-width: 1024px) {
+  main {
+    width: calc(100% - 28px);
+    margin: 14px auto;
+  }
+
+  .cards {
+    grid-template-columns: 1.5fr 1fr 1fr;
+  }
+
+  .secondary-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Celular */
+@media (max-width: 600px) {
 
   html,
   body {
-    min-height: 100%;
     overflow-x: hidden;
     overflow-y: auto;
   }
@@ -360,13 +469,9 @@ main::-webkit-scrollbar-thumb:hover {
 
   main {
     width: 100%;
-    height: auto;
     min-height: 100dvh;
     margin: 0;
-
-    /* No celular, o scroll deve ser da página */
     overflow: visible;
-
     border-top: 0;
     border-right: 0;
     border-left: 0;
@@ -380,9 +485,8 @@ main::-webkit-scrollbar-thumb:hover {
   }
 
   h1 {
-    padding: 26px 18px 10px;
-    font-size: clamp(2.1rem, 10vw, 3.2rem);
-    line-height: 0.9;
+    padding: 24px 12px 10px;
+    font-size: 2.15rem;
   }
 
   h1::after {
@@ -392,41 +496,52 @@ main::-webkit-scrollbar-thumb:hover {
   }
 
   .status {
-    margin: 0 18px 20px;
+    max-width: 300px;
+    margin: 0 12px 16px;
     font-size: 0.72rem;
     line-height: 1.25;
-    letter-spacing: 0.08em;
+  }
+
+  .simulation-controls {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+    padding: 0 12px 14px;
+  }
+
+  .simulation-controls select {
+    width: 100%;
+    min-width: 0;
   }
 
   .cards {
     grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 0 18px 18px;
+    gap: 7px;
+    padding: 0 12px 16px;
   }
 
   .card {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: 92px;
-    padding: 14px 17px;
+    min-height: 82px;
+    padding: 10px 12px;
   }
 
   .card span {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
 
   .card strong {
     margin-top: 0;
-    font-size: clamp(2.9rem, 14vw, 4.5rem);
+    font-size: 3rem;
     text-align: right;
   }
 
   .chart-box {
-    height: 300px;
-    margin: 0 18px 24px;
-    padding: 28px 2px 4px;
-    border-radius: 7px;
+    height: 260px;
+    margin: 0 12px 16px;
+    padding: 25px 2px 3px;
   }
 
   .recharts-text {
@@ -434,138 +549,32 @@ main::-webkit-scrollbar-thumb:hover {
   }
 
   .recharts-legend-item-text {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
-}
 
-.secondary-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  padding: 0 30px 30px;
-}
-
-.secondary-cards .card {
-  min-height: 100px;
-}
-
-.secondary-cards .card strong {
-  font-size: clamp(2.1rem, 4vw, 3.5rem);
-}
-
-.secondary-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  padding: 0 30px 30px;
-}
-
-.secondary-cards .card {
-  min-height: 100px;
-}
-
-.secondary-cards .card strong {
-  font-size: clamp(2.1rem, 4vw, 3.5rem);
-}
-
-@media (max-width: 1024px),
-(orientation: portrait) {
   .secondary-cards {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 0 18px 24px;
-  }
-}
-
-.simulation-controls {
-  display: flex;
-  justify-content: center;
-  padding: 0 30px 20px;
-}
-
-.simulation-controls button {
-  padding: 11px 18px;
-  border: 1px solid #3d4b57;
-  border-radius: 5px;
-  color: #dbe7ef;
-  background: #17212a;
-  cursor: pointer;
-  font-family: "Rajdhani", Arial, sans-serif;
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: 0.2s ease;
-}
-
-.simulation-controls button:hover {
-  border-color: var(--blue);
-  color: white;
-  background: #1d3544;
-  box-shadow: 0 0 12px rgba(0, 168, 255, 0.25);
-}
-
-.simulation-controls button.active {
-  border-color: var(--red);
-  color: white;
-  background: #49131d;
-  box-shadow: 0 0 14px rgba(241, 22, 49, 0.4);
-}
-
-@media (max-width: 1024px),
-(orientation: portrait) {
-  .simulation-controls {
-    padding: 0 18px 18px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+    padding: 0 12px 18px;
   }
 
-  .simulation-controls button {
-    width: 100%;
-  }
-}
-
-/* Celulares pequenos */
-@media (max-width: 480px) {
-  h1 {
-    padding-top: 22px;
-    font-size: 2.15rem;
+  .secondary-cards .card {
+    display: block;
+    min-height: 72px;
+    padding: 8px 10px;
   }
 
-  .status {
-    max-width: 300px;
+  .secondary-cards .card span {
+    font-size: 0.72rem;
   }
 
-  .card {
-    min-height: 82px;
+  .secondary-cards .card strong {
+    margin-top: 4px;
+    font-size: 2rem;
+    text-align: left;
   }
 
-  .card strong {
-    font-size: 3rem;
+  .alarm-list {
+    padding: 0 12px 12px;
   }
-
-  .chart-box {
-    height: 255px;
-    margin-right: 12px;
-    margin-left: 12px;
-  }
-
-  .cards {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-
-  .status {
-    margin-right: 12px;
-    margin-left: 12px;
-  }
-
-  h1 {
-    padding-right: 12px;
-    padding-left: 12px;
-  }
-}
-
-.secondary-cards {
-  grid-template-columns: 1fr;
-  gap: 10px;
-  padding: 0 18px 24px;
 }
