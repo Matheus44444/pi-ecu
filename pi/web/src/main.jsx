@@ -1,613 +1,415 @@
-import React, { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import React, { useEffect, useMemo, useState } from "react";
+import ReactDOM from "react-dom/client";
+import "./style.css";
 
+import downloadTelemetryCsv from "./utils/csvExport";
 import AlarmBanner from "./components/AlarmBanner";
 import ChannelDetails from "./components/ChannelDetails";
 import MetricCard from "./components/MetricCard";
 import SimulationPanel from "./components/SimulationPanel";
+import TelemetryChart from "./components/TelemetryChart";
+import channels from "./data/channels";
 
-import { canais } from "./data/channels";
-import { avaliarAlarmes } from "./utils/alarms";
-import { exportarCSV } from "./utils/csvExport";
-
-import "./style.css";
-
-const MAX_POINTS = 60;
-
-const valoresPadrao = {
-  rpm: 900,
-  map_kpa: 100,
-  tps: 0,
+const DEFAULT_VALUES = {
+  rpm: 2500,
+  map_kpa: 120,
+  tps: 40,
   ect_c: 85,
-  iat_c: 28,
-  battery_v: 13.8,
-  oil_bar: 4.0,
   fuel_bar: 3.1,
-  lambda1: 1.0,
+  oil_bar: 4,
+  lambda1: 0.94,
+  iat_c: 35,
+  battery_v: 13.7,
 };
 
-function limitar(valor, minimo, maximo) {
-  return Math.max(minimo, Math.min(maximo, valor));
+const DEFAULT_SETTINGS = {
+  mainChartChannels: ["rpm", "map_kpa"],
+  selectedChannel: "tps",
+  showSelectedChart: false,
+  showMainLegend: true,
+  showSensorCards: true,
+  showGrid: true,
+  maxMainChannels: 2,
+};
+
+const FALLBACK_CHANNELS = [
+  { id: "rpm", nome: "RPM", unidade: "rpm", cor: "#ff3151" },
+  { id: "map_kpa", nome: "MAP", unidade: "kPa", cor: "#16b9ff" },
+  { id: "lambda1", nome: "Lambda", unidade: "λ", cor: "#00d084" },
+  { id: "tps", nome: "TPS", unidade: "%", cor: "#b085ff" },
+  { id: "fuel_bar", nome: "Pressão de combustível", unidade: "bar", cor: "#ffd600" },
+  { id: "oil_bar", nome: "Pressão de óleo", unidade: "bar", cor: "#ff9418" },
+  { id: "ect_c", nome: "Temperatura do motor", unidade: "°C", cor: "#ff3151" },
+  { id: "iat_c", nome: "Temperatura do ar", unidade: "°C", cor: "#00d9ff" },
+  { id: "battery_v", nome: "Bateria", unidade: "V", cor: "#00e676" },
+];
+
+const CHANNEL_LIST = Array.isArray(channels) && channels.length ? channels : FALLBACK_CHANNELS;
+
+function getId(channel) {
+  return channel?.id || channel?.key || channel?.name;
 }
 
-function criarTelemetriaAnterior(
-  valores = valoresPadrao
-) {
+function getName(channel) {
+  return channel?.nome || channel?.label || channel?.name || getId(channel);
+}
+
+function getUnit(channel) {
+  return channel?.unidade || channel?.unit || "";
+}
+
+function getColor(channel) {
+  return channel?.cor || channel?.color || "#16b9ff";
+}
+
+function getChannel(id) {
+  return CHANNEL_LIST.find((channel) => getId(channel) === id) || FALLBACK_CHANNELS.find((channel) => getId(channel) === id) || FALLBACK_CHANNELS[0];
+}
+
+function normalizeSettings(value) {
+  const saved = value && typeof value === "object" ? value : {};
+  const validIds = new Set(CHANNEL_LIST.map(getId));
+  const selected = Array.isArray(saved.mainChartChannels)
+    ? saved.mainChartChannels.filter((id) => validIds.has(id))
+    : DEFAULT_SETTINGS.mainChartChannels;
+
   return {
-    time: new Date().toLocaleTimeString(),
-
-    rpm: valores.rpm ?? 900,
-    map_kpa: valores.map_kpa ?? 100,
-    lambda1: valores.lambda1 ?? 1.0,
-
-    tps: valores.tps ?? 0,
-    ect_c: valores.ect_c ?? 85,
-    iat_c: valores.iat_c ?? 28,
-
-    battery_v: valores.battery_v ?? 13.8,
-    oil_bar: valores.oil_bar ?? 4.0,
-    fuel_bar: valores.fuel_bar ?? 3.1,
+    ...DEFAULT_SETTINGS,
+    ...saved,
+    mainChartChannels: selected.length ? selected.slice(0, 4) : DEFAULT_SETTINGS.mainChartChannels,
+    maxMainChannels: Math.max(1, Math.min(4, Number(saved.maxMainChannels) || 2)),
   };
 }
 
-function gerarTelemetria(
-  anterior = criarTelemetriaAnterior()
-) {
-  const rpm = limitar(
-    anterior.rpm + (Math.random() - 0.5) * 280,
-    750,
-    6500
-  );
-
-  const mapKpa = limitar(
-    anterior.map_kpa + (Math.random() - 0.5) * 12,
-    30,
-    220
-  );
-
-  const tps = limitar(
-    anterior.tps + (Math.random() - 0.5) * 12,
-    0,
-    100
-  );
-
+function initialTelemetry() {
   return {
-    time: new Date().toLocaleTimeString(),
-
-    rpm: Math.round(rpm),
-    map_kpa: Math.round(mapKpa),
-
-    lambda1: Number(
-      (
-        anterior.lambda1 +
-        (Math.random() - 0.5) * 0.04
-      ).toFixed(2)
-    ),
-
-    tps: Math.round(tps),
-
-    ect_c: Math.round(
-      limitar(
-        anterior.ect_c +
-        (Math.random() - 0.5) * 2,
-        75,
-        110
-      )
-    ),
-
-    iat_c: Math.round(
-      limitar(
-        anterior.iat_c +
-        (Math.random() - 0.5) * 2,
-        20,
-        55
-      )
-    ),
-
-    battery_v: Number(
-      limitar(
-        anterior.battery_v +
-        (Math.random() - 0.5) * 0.15,
-        12,
-        14.8
-      ).toFixed(1)
-    ),
-
-    oil_bar: Number(
-      limitar(
-        anterior.oil_bar +
-        (Math.random() - 0.5) * 0.3,
-        0.5,
-        6
-      ).toFixed(1)
-    ),
-
-    fuel_bar: Number(
-      limitar(
-        anterior.fuel_bar +
-        (Math.random() - 0.5) * 0.2,
-        1,
-        5
-      ).toFixed(1)
-    ),
+    time: new Date().toLocaleTimeString("pt-BR"),
+    ...DEFAULT_VALUES,
   };
 }
 
-function aplicarModoSimulacao(
-  ponto,
-  anterior,
-  modo
-) {
-  const resultado = { ...ponto };
+function nextTelemetry(previous) {
+  const nextTps = Math.max(0, Math.min(100, previous.tps + (Math.random() - 0.5) * 4));
+  const rpmTarget = 850 + nextTps * 42;
+  const nextRpm = Math.max(700, Math.min(7000, previous.rpm + (rpmTarget - previous.rpm) * 0.12 + (Math.random() - 0.5) * 120));
+  const mapTarget = 30 + nextTps * 1.7;
+  const nextMap = Math.max(20, Math.min(250, previous.map_kpa + (mapTarget - previous.map_kpa) * 0.1 + (Math.random() - 0.5) * 4));
 
-  switch (modo) {
-    case "temperature":
-      resultado.ect_c = Math.min(
-        anterior.ect_c + 2,
-        115
-      );
-      break;
-
-    case "battery":
-      resultado.battery_v = Number(
-        Math.max(
-          anterior.battery_v - 0.2,
-          10.5
-        ).toFixed(1)
-      );
-      break;
-
-    case "oil":
-      resultado.oil_bar = Number(
-        Math.max(
-          anterior.oil_bar - 0.3,
-          0.3
-        ).toFixed(1)
-      );
-      break;
-
-    case "fuel":
-      resultado.fuel_bar = Number(
-        Math.max(
-          anterior.fuel_bar - 0.2,
-          0.8
-        ).toFixed(1)
-      );
-      break;
-
-    case "normal":
-    default:
-      break;
-  }
-
-  return resultado;
+  return {
+    time: new Date().toLocaleTimeString("pt-BR"),
+    rpm: Math.round(nextRpm),
+    map_kpa: Number(nextMap.toFixed(1)),
+    tps: Number(nextTps.toFixed(1)),
+    lambda1: Number(Math.max(0.7, Math.min(1.3, 1.02 - nextTps / 100 * 0.14 + (Math.random() - 0.5) * 0.025)).toFixed(2)),
+    fuel_bar: Number((3.25 + nextTps / 100 * 0.25 + (Math.random() - 0.5) * 0.1).toFixed(2)),
+    oil_bar: Number((2.4 + nextRpm / 2300 + (Math.random() - 0.5) * 0.15).toFixed(2)),
+    ect_c: Number(Math.min(120, previous.ect_c + (Math.random() - 0.45) * 0.12).toFixed(1)),
+    iat_c: Number((30 + nextTps / 100 * 16 + (Math.random() - 0.5)).toFixed(1)),
+    battery_v: Number((13.7 + (Math.random() - 0.5) * 0.2).toFixed(2)),
+  };
 }
 
-function Card({ title, value }) {
-  return (
-    <div className="card">
-      <span>{title}</span>
-      <strong>{value}</strong>
-    </div>
-  );
+function displayValue(value, channel) {
+  if (value === undefined || value === null) return "—";
+  const id = getId(channel);
+  if (id === "rpm") return Math.round(value);
+  if (id === "lambda1") return Number(value).toFixed(2);
+  if (id === "battery_v") return Number(value).toFixed(1);
+  return Number(value).toFixed(1);
 }
 
 function App() {
-
-  const [mainChartChannels, setMainChartChannels] =
-    useState(() => {
-      try {
-        const salvo = localStorage.getItem(
-          "pi-ecu-main-chart-channels"
-        );
-
-        const canaisSalvos = salvo
-          ? JSON.parse(salvo)
-          : ["rpm", "map_kpa"];
-
-        return Array.isArray(canaisSalvos) &&
-          canaisSalvos.length > 0
-          ? canaisSalvos.slice(0, 3)
-          : ["rpm", "map_kpa"];
-      } catch {
-        return ["rpm", "map_kpa"];
-      }
-    });
+  const [telemetry, setTelemetry] = useState(() => [initialTelemetry()]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [simulationOpen, setSimulationOpen] = useState(false);
+  const [settings, setSettings] = useState(() => {
+    try {
+      return normalizeSettings(JSON.parse(localStorage.getItem("pi-ecu-dashboard-settings") || "null"));
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
+  const [simulationValues, setSimulationValues] = useState(() => ({ ...DEFAULT_VALUES }));
+  const [selectedChannel, setSelectedChannel] = useState(settings.selectedChannel || "tps");
 
   useEffect(() => {
-    localStorage.setItem(
-      "pi-ecu-main-chart-channels",
-      JSON.stringify(mainChartChannels)
-    );
-  }, [mainChartChannels]);
-  
-  const [simulationValues, setSimulationValues] =
-    useState(valoresPadrao);
-
-  const [activeValues, setActiveValues] =
-    useState(valoresPadrao);
-
-  const [simulationMode, setSimulationMode] =
-    useState("normal");
-
-  const [selectedChannel, setSelectedChannel] =
-    useState("fuel_bar");
-
-  const [telemetry, setTelemetry] = useState([
-    criarTelemetriaAnterior(valoresPadrao),
-  ]);
-
-  function aplicarConfiguracao() {
-    const novoPonto =
-      criarTelemetriaAnterior(simulationValues);
-
-    setActiveValues({
-      ...simulationValues,
-    });
-
-    setTelemetry([novoPonto]);
-
-    localStorage.setItem(
-      "pi-ecu-telemetry",
-      JSON.stringify([novoPonto])
-    );
-  }
-
-  function restaurarConfiguracao() {
-    const valoresRestaurados = {
-      ...valoresPadrao,
-    };
-
-    const novoPonto =
-      criarTelemetriaAnterior(
-        valoresRestaurados
-      );
-
-    setSimulationValues(valoresRestaurados);
-    setActiveValues(valoresRestaurados);
-    setTelemetry([novoPonto]);
-
-    localStorage.setItem(
-      "pi-ecu-telemetry",
-      JSON.stringify([novoPonto])
-    );
-  }
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTelemetry((previous) => {
-        const lastPoint =
-          previous.at(-1) ||
-          criarTelemetriaAnterior(
-            activeValues
-          );
-
-        const generatedPoint =
-          gerarTelemetria(lastPoint);
-
-        const nextPoint =
-          aplicarModoSimulacao(
-            generatedPoint,
-            lastPoint,
-            simulationMode
-          );
-
-        return [
-          ...previous.slice(-(MAX_POINTS - 1)),
-          nextPoint,
-        ];
+    const timer = window.setInterval(() => {
+      setTelemetry((current) => {
+        const previous = current[current.length - 1] || initialTelemetry();
+        return [...current, nextTelemetry(previous)].slice(-40);
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [simulationMode, activeValues]);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(
-      "pi-ecu-telemetry",
-      JSON.stringify(telemetry)
-    );
-  }, [telemetry]);
+    localStorage.setItem("pi-ecu-dashboard-settings", JSON.stringify({ ...settings, selectedChannel }));
+  }, [settings, selectedChannel]);
 
-  const current =
-    telemetry.at(-1) ||
-    criarTelemetriaAnterior(
-      activeValues
-    );
+  const current = telemetry[telemetry.length - 1] || initialTelemetry();
+  const selectedDefinition = useMemo(() => getChannel(selectedChannel), [selectedChannel]);
 
-  const alarms = avaliarAlarmes(current);
+  function updateSetting(key, value) {
+    setSettings((old) => ({ ...old, [key]: value }));
+  }
 
-  const selectedDefinition =
-    canais.find(
-      (canal) => canal.id === selectedChannel
-    ) || canais[0];
-
-  const chartChannels = canais.filter(
-    (canal) =>
-      !["rpm", "map_kpa", "lambda1"].includes(canal.id)
-  );
-  
-  function alternarCanalGrafico(canalId) {
-    setMainChartChannels((atuais) => {
-      if (atuais.includes(canalId)) {
-        return atuais.filter(
-          (id) => id !== canalId
-        );
+  function toggleChartChannel(id) {
+    setSettings((old) => {
+      const currentIds = old.mainChartChannels || [];
+      if (currentIds.includes(id)) {
+        if (currentIds.length === 1) return old;
+        return { ...old, mainChartChannels: currentIds.filter((item) => item !== id) };
       }
-
-      if (atuais.length >= 3) {
-        return atuais;
-      }
-
-      return [...atuais, canalId];
+      if (currentIds.length >= old.maxMainChannels) return old;
+      return { ...old, mainChartChannels: [...currentIds, id] };
     });
   }
 
-  return (
-    <main>
-      <h1>Pi-ECU Dashboard</h1>
+  function resetAll() {
+    setSettings(DEFAULT_SETTINGS);
+    setSimulationValues(DEFAULT_VALUES);
+    setSelectedChannel(DEFAULT_SETTINGS.selectedChannel);
+  }
 
-      <p className="status">
-        <span className="led"></span>
-        Modo simulação — nenhum hardware conectado
-      </p>
+  function renderPrimaryMetric(id) {
+    const channel = getChannel(id);
 
-      <AlarmBanner alarms={alarms} />
-
-      <div className="simulation-controls">
-        <label htmlFor="simulation-mode">
-          TESTE DE SIMULAÇÃO
-        </label>
-
-        <select
-          id="simulation-mode"
-          value={simulationMode}
-          onChange={(event) =>
-            setSimulationMode(event.target.value)
-          }
-        >
-          <option value="normal">
-            Operação normal
-          </option>
-
-          <option value="temperature">
-            Aumentar temperatura
-          </option>
-
-          <option value="battery">
-            Reduzir bateria
-          </option>
-
-          <option value="oil">
-            Reduzir pressão de óleo
-          </option>
-
-          <option value="fuel">
-            Reduzir pressão de combustível
-          </option>
-        </select>
-      </div>
-
-      <SimulationPanel
-        valores={simulationValues}
-        onChange={setSimulationValues}
-        onApply={aplicarConfiguracao}
-        onReset={restaurarConfiguracao}
+    return (
+      <MetricCard
+        key={id}
+        canal={channel}
+        channel={channel}
+        title={getName(channel)}
+        label={getName(channel)}
+        value={displayValue(current[id], channel)}
+        unit={getUnit(channel)}
+        color={getColor(channel)}
       />
+    );
+  }
 
+  function renderSensorCard(channel) {
+    const id = getId(channel);
+    const active = selectedChannel === id;
+
+    return (
       <button
-        className="export-button"
-        onClick={() => exportarCSV(telemetry)}
+        className={`sensor-card ${active ? "active" : ""}`}
+        key={id}
+        type="button"
+        onClick={() => setSelectedChannel(id)}
+        style={{ "--channel-color": getColor(channel) }}
       >
-        EXPORTAR CSV
+        <span className="sensor-card-label">{getName(channel)}</span>
+        <strong>{displayValue(current[id], channel)}</strong>
+        <small>{getUnit(channel)}</small>
+        <em>CLIQUE PARA SELECIONAR</em>
       </button>
+    );
+  }
 
-      <section className="cards">
-        <Card
-          title="RPM"
-          value={current.rpm}
-        />
-
-        <Card
-          title="MAP"
-          value={`${current.map_kpa} kPa`}
-        />
-
-        <Card
-          title="Lambda"
-          value={current.lambda1.toFixed(2)}
-        />
-      </section>
-
-      <section className="chart-selector">
-        <div className="chart-selector-title">
-          CANAIS DO GRÁFICO PRINCIPAL
+  return (
+    <main className="app-shell">
+      <header className="dashboard-header">
+        <div>
+          <div className="eyebrow">PI-ECU / LABORATÓRIO DE TELEMETRIA</div>
+          <h1>PI-ECU DASHBOARD</h1>
+          <p className="connection-status"><span className="status-dot" /> MODO SIMULAÇÃO — NENHUM HARDWARE CONECTADO</p>
         </div>
 
-        <div className="chart-selector-options">
-          <label className="chart-option">
-            <input
-              type="checkbox"
-              checked={mainChartChannels.includes("rpm")}
-              onChange={() =>
-                alternarCanalGrafico("rpm")
-              }
-            />
-
-            <span>RPM</span>
-          </label>
-
-          <label className="chart-option">
-            <input
-              type="checkbox"
-              checked={mainChartChannels.includes("map_kpa")}
-              onChange={() =>
-                alternarCanalGrafico("map_kpa")
-              }
-            />
-
-            <span>MAP</span>
-          </label>
-
-          <label className="chart-option">
-            <input
-              type="checkbox"
-              checked={mainChartChannels.includes("lambda1")}
-              onChange={() =>
-                alternarCanalGrafico("lambda1")
-              }
-            />
-
-            <span>LAMBDA</span>
-          </label>
-
-          {chartChannels.map((canal) => (
-            <label
-              className="chart-option"
-              key={canal.id}
-            >
-              <input
-                type="checkbox"
-                checked={mainChartChannels.includes(canal.id)}
-                onChange={() =>
-                  alternarCanalGrafico(canal.id)
-                }
-              />
-
-              <span>{canal.nome}</span>
-            </label>
-          ))}
-        </div>
-
-        <small>
-          Selecione até três canais
-        </small>
-      </section>
-
-      <section className="chart-box">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={telemetry}>
-            <CartesianGrid strokeDasharray="3 3" />
-
-            <XAxis dataKey="time" />
-            <YAxis />
-
-            <Tooltip />
-            <Legend />
-
-            {mainChartChannels.map((canalId) => {
-              const canal = canais.find(
-                (item) => item.id === canalId
+        <div className="header-actions">
+          <button
+            className="csv-button"
+            type="button"
+            onClick={() => {
+              downloadTelemetryCsv(
+                telemetry,
+                `pi-ecu-${new Date()
+                  .toISOString()
+                  .slice(0, 19)
+                  .replace(/:/g, "-")}.csv`
               );
-
-              if (!canal) {
-                return null;
-              }
-
-              return (
-                <Line
-                  key={canal.id}
-                  type="monotone"
-                  dataKey={canal.id}
-                  stroke={canal.cor}
-                  strokeWidth={2}
-                  dot={false}
-                  name={`${canal.nome} (${canal.unidade})`}
-                  connectNulls
-                />
-              );
-            })}
-          </LineChart>
-        </ResponsiveContainer>
-      </section>
-
-      <section className="selected-chart-box">
-        <div className="selected-chart-header">
-          <span>CANAL EM DETALHE</span>
-
-          <strong
-            style={{
-              color: selectedDefinition.cor,
             }}
           >
-            {selectedDefinition.nome}
-          </strong>
+            ↓ EXPORTAR CSV
+          </button>
+
+          <button
+            className="settings-button"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+          >
+            ⚙ CONFIGURAÇÕES
+          </button>
         </div>
 
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={telemetry}>
-            <CartesianGrid strokeDasharray="3 3" />
+      </header>
 
-            <XAxis dataKey="time" />
+      <div className="system-status">
+        <span className="status-dot" />
+        SISTEMA NORMAL
+        <span className="status-divider">•</span>
+        NENHUM ALARME
+      </div>
 
-            <YAxis
-              domain={[
-                selectedDefinition.minimo ?? "auto",
-                selectedDefinition.maximo ?? "auto",
-              ]}
-            />
+      <AlarmBanner />
 
-            <Tooltip
-              formatter={(value) =>
-                `${Number(value).toFixed(2)} ${selectedDefinition.unidade
-                }`
-              }
-            />
-
-            <Line
-              type="monotone"
-              dataKey={selectedDefinition.id}
-              stroke={selectedDefinition.cor}
-              strokeWidth={3}
-              dot={false}
-              name={`${selectedDefinition.nome} (${selectedDefinition.unidade})`}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+      <section className="primary-metrics">
+        {[
+          "rpm",
+          "map_kpa",
+          "tps",
+          "lambda1",
+          "ect_c",
+          "battery_v",
+        ].map(renderPrimaryMetric)}
       </section>
 
-      <section className="channel-grid">
-        {canais
-          .filter(
-            (canal) =>
-              ![
-                "rpm",
-                "map_kpa",
-                "lambda1",
-              ].includes(canal.id)
-          )
-          .map((canal) => (
-            <MetricCard
-              key={canal.id}
-              canal={canal}
-              valor={current[canal.id]}
-              selecionado={
-                selectedChannel === canal.id
-              }
-              onClick={setSelectedChannel}
-            />
-          ))}
+      <section className="section-heading">
+        <div>
+          <span className="section-kicker">MONITORAMENTO</span>
+          <h2>Telemetria em tempo real</h2>
+        </div>
+        <span className="sample-count">{telemetry.length} amostras</span>
       </section>
 
-      <ChannelDetails
-        canal={selectedDefinition}
-        valor={current[selectedChannel]}
-        historico={telemetry}
-      />
+      <section className="chart-box main-chart-box">
+        <div className="chart-title">LIVE TELEMETRY / CANAIS PRINCIPAIS</div>
+        <TelemetryChart
+          telemetry={telemetry}
+          data={telemetry}
+          selectedChannels={settings.mainChartChannels}
+          channels={CHANNEL_LIST}
+          showLegend={settings.showMainLegend}
+          showGrid={settings.showGrid}
+        />
+      </section>
+
+      {settings.showSensorCards && (
+        <>
+          <section className="section-heading compact-heading">
+            <div>
+              <span className="section-kicker">SENSORES</span>
+              <h2>Canais disponíveis</h2>
+            </div>
+            <span className="section-hint">Clique para selecionar</span>
+          </section>
+
+          <section className="channel-grid">
+            {CHANNEL_LIST.filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel))).map(renderSensorCard)}
+          </section>
+        </>
+      )}
+
+      {settings.showSelectedChart && (
+        <section className="selected-chart-box">
+          <div className="selected-chart-header">
+            <span>CANAL EM DETALHE</span>
+            <strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong>
+          </div>
+          <ChannelDetails channelId={selectedChannel} telemetry={telemetry} data={current} />
+        </section>
+      )}
+
+      <section className="simulation-collapsed">
+        <div>
+          <span className="section-kicker">CONTROLE DA SIMULAÇÃO</span>
+          <strong>Parâmetros iniciais do motor</strong>
+          <small>RPM, MAP, TPS, temperatura e pressões</small>
+        </div>
+        <button type="button" onClick={() => setSimulationOpen((value) => !value)}>
+          {simulationOpen ? "OCULTAR" : "ABRIR CONTROLES"}
+        </button>
+      </section>
+
+      {simulationOpen && (
+        <SimulationPanel
+          valores={simulationValues}
+          values={simulationValues}
+          onChange={setSimulationValues}
+          onApply={setSimulationValues}
+        />
+      )}
+
+      <section className="selected-channel-footer">
+        <span>CANAL SELECIONADO</span>
+        <strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong>
+      </section>
+
+      {settingsOpen && (
+        <div className="settings-overlay" onClick={() => setSettingsOpen(false)}>
+          <aside className="settings-drawer" onClick={(event) => event.stopPropagation()}>
+            <div className="settings-drawer-header">
+              <div>
+                <span>PI-ECU</span>
+                <h2>CONFIGURAÇÕES</h2>
+              </div>
+              <button className="settings-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="Fechar configurações">×</button>
+            </div>
+
+            <section className="settings-section">
+              <h3>CANAIS DO GRÁFICO PRINCIPAL</h3>
+              <p className="settings-help">Use até {settings.maxMainChannels} canais de cada vez. Para melhor leitura, combine sinais de escala semelhante.</p>
+              <div className="settings-channel-list">
+                {CHANNEL_LIST.map((channel) => {
+                  const id = getId(channel);
+                  return (
+                    <label className="settings-check-row" key={id}>
+                      <input type="checkbox" checked={settings.mainChartChannels.includes(id)} onChange={() => toggleChartChannel(id)} />
+                      <span className="channel-color" style={{ backgroundColor: getColor(channel) }} />
+                      <span>{getName(channel)}</span>
+                      <small>{getUnit(channel)}</small>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="settings-section">
+              <h3>CANAL EM DETALHE</h3>
+              <select className="settings-select" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value)}>
+                {CHANNEL_LIST.map((channel) => <option key={getId(channel)} value={getId(channel)}>{getName(channel)}</option>)}
+              </select>
+              <label className="settings-check-row settings-spaced-row">
+                <input type="checkbox" checked={settings.showSelectedChart} onChange={(event) => updateSetting("showSelectedChart", event.target.checked)} />
+                <span>Mostrar canal em detalhe</span>
+              </label>
+            </section>
+
+            <section className="settings-section">
+              <h3>ELEMENTOS DA TELA</h3>
+              <label className="settings-check-row"><input type="checkbox" checked={settings.showMainLegend} onChange={(event) => updateSetting("showMainLegend", event.target.checked)} /><span>Mostrar legenda do gráfico</span></label>
+              <label className="settings-check-row"><input type="checkbox" checked={settings.showSensorCards} onChange={(event) => updateSetting("showSensorCards", event.target.checked)} /><span>Mostrar sensores secundários</span></label>
+              <label className="settings-check-row"><input type="checkbox" checked={settings.showGrid} onChange={(event) => updateSetting("showGrid", event.target.checked)} /><span>Mostrar grade do gráfico</span></label>
+            </section>
+
+            <section className="settings-section">
+              <h3>LIMITE DE CANAIS</h3>
+              <select className="settings-select" value={settings.maxMainChannels} onChange={(event) => {
+                const maximum = Number(event.target.value);
+                setSettings((old) => ({ ...old, maxMainChannels: maximum, mainChartChannels: old.mainChartChannels.slice(0, maximum) }));
+              }}>
+                <option value={1}>1 canal</option>
+                <option value={2}>2 canais</option>
+                <option value={3}>3 canais</option>
+                <option value={4}>4 canais</option>
+              </select>
+            </section>
+
+            <div className="settings-drawer-footer">
+              <button className="restore-button" type="button" onClick={resetAll}>RESTAURAR PADRÕES</button>
+              <button className="apply-button" type="button" onClick={() => setSettingsOpen(false)}>FECHAR</button>
+            </div>
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
 
-createRoot(
-  document.getElementById("root")
-).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);

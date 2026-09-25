@@ -1,81 +1,55 @@
-function calcularEstado(canal, valor) {
-  if (!Number.isFinite(valor)) {
-    return "normal";
-  }
+import React from "react";
 
-  const possuiLimiteInferior =
-    canal.normalMin !== undefined ||
-    canal.id === "fuel_bar" ||
-    canal.id === "oil_bar" ||
-    canal.id === "battery_v";
+function MetricCard({
+  canal,
+  channel,
+  title,
+  label,
+  value = "—",
+  unit,
+  color,
+}) {
+  const definition = canal || channel || {};
 
-  if (
-    possuiLimiteInferior &&
-    canal.critico !== undefined &&
-    valor <= canal.critico
-  ) {
-    return "critico";
-  }
+  const nome =
+    definition.nome ||
+    definition.label ||
+    title ||
+    label ||
+    "CANAL";
 
-  if (
-    possuiLimiteInferior &&
-    canal.alerta !== undefined &&
-    valor <= canal.alerta
-  ) {
-    return "alerta";
-  }
+  const unidade =
+    definition.unidade ||
+    definition.unit ||
+    unit ||
+    "";
 
-  if (canal.normalMax !== undefined && valor > canal.normalMax) {
-    if (canal.critico !== undefined && valor >= canal.critico) {
-      return "critico";
-    }
-
-    return "alerta";
-  }
-
-  if (
-    !possuiLimiteInferior &&
-    canal.alerta !== undefined &&
-    valor >= canal.alerta
-  ) {
-    return "alerta";
-  }
-
-  if (
-    !possuiLimiteInferior &&
-    canal.critico !== undefined &&
-    valor >= canal.critico
-  ) {
-    return "critico";
-  }
-
-  return "normal";
-}
-
-export default function MetricCard({ canal, valor, selecionado, onClick }) {
-  const valorNumerico = Number(valor);
-  const estado = calcularEstado(canal, valorNumerico);
+  const cor =
+    definition.cor ||
+    definition.color ||
+    color ||
+    "#16b9ff";
 
   return (
-    <button
-      type="button"
-      className={[
-        "metric-card",
-        `metric-${estado}`,
-        selecionado ? "metric-selected" : "",
-      ].join(" ")}
-      onClick={() => onClick(canal.id)}
-      style={{ "--metric-color": canal.cor }}
+    <article
+      className="metric-card"
+      style={{
+        "--metric-color": cor,
+      }}
     >
-      <span>{canal.nome}</span>
+      <span className="metric-card-label">
+        {nome}
+      </span>
 
-      <strong>
-        {Number.isFinite(valorNumerico) ? valorNumerico : "--"}
-
-        <small>{canal.unidade}</small>
+      <strong className="metric-card-value">
+        {value}
       </strong>
 
-      <em>clique para detalhes</em>
-    </button>
+      <small className="metric-card-unit">
+        {unidade}
+      </small>
+    </article>
   );
 }
+
+export default MetricCard;
