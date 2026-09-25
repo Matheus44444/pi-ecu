@@ -1,50 +1,109 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  LineChart,
+  CartesianGrid,
+  Legend,
   Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 import "./style.css";
 
+const MAX_POINTS = 60;
+
+function limitar(valor, minimo, maximo) {
+  return Math.max(minimo, Math.min(maximo, valor));
+}
+
+function criarTelemetriaAnterior() {
+  return {
+    rpm: 900,
+    map_kpa: 100,
+    lambda1: 1.0,
+    tps: 0,
+    ect_c: 85,
+    iat_c: 28,
+    battery_v: 13.8,
+    oil_bar: 4.0,
+    fuel_bar: 3.1,
+  };
+}
+
+function gerarTelemetria(anterior = criarTelemetriaAnterior()) {
+  const rpm = limitar(
+    anterior.rpm + (Math.random() - 0.5) * 280,
+    750,
+    6500
+  );
+
+  const mapKpa = limitar(
+    anterior.map_kpa + (Math.random() - 0.5) * 12,
+    30,
+    220
+  );
+
+  const tps = limitar(
+    anterior.tps + (Math.random() - 0.5) * 12,
+    0,
+    100
+  );
+
+  return {
+    time: new Date().toLocaleTimeString(),
+
+    rpm: Math.round(rpm),
+    map_kpa: Math.round(mapKpa),
+    lambda1: Number((1 + (Math.random() - 0.5) * 0.04).toFixed(2)),
+
+    tps: Math.round(tps),
+    ect_c: Math.round(limitar(anterior.ect_c + (Math.random() - 0.5) * 2, 75, 110)),
+    iat_c: Math.round(limitar(anterior.iat_c + (Math.random() - 0.5) * 2, 20, 55)),
+
+    battery_v: Number(
+      limitar(anterior.battery_v + (Math.random() - 0.5) * 0.15, 12, 14.8).toFixed(1)
+    ),
+
+    oil_bar: Number(
+      limitar(anterior.oil_bar + (Math.random() - 0.5) * 0.3, 0.5, 6).toFixed(1)
+    ),
+
+    fuel_bar: Number(
+      limitar(anterior.fuel_bar + (Math.random() - 0.5) * 0.2, 1, 5).toFixed(1)
+    ),
+  };
+}
+
+function Card({ title, value }) {
+  return (
+    <div className="card">
+      <span>{title}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function App() {
-  const [telemetry, setTelemetry] = useState([]);
+  const [telemetry, setTelemetry] = useState(() => [
+    gerarTelemetria(),
+  ]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      const previous = telemetry.at(-1);
+      setTelemetry((previous) => {
+        const lastPoint = previous.at(-1) || criarTelemetriaAnterior();
+        const nextPoint = gerarTelemetria(lastPoint);
 
-      const rpm = previous
-        ? Math.max(700, Math.min(6500, previous.rpm + (Math.random() - 0.5) * 300))
-        : 800;
-
-      const map = previous
-        ? Math.max(30, Math.min(220, previous.map_kpa + (Math.random() - 0.5) * 8))
-        : 100;
-
-      const point = {
-        time: new Date().toLocaleTimeString(),
-        rpm: Math.round(rpm),
-        map_kpa: Math.round(map),
-        lambda1: Number((1 + (Math.random() - 0.5) * 0.04).toFixed(2)),
-      };
-
-      setTelemetry((old) => [...old.slice(-59), point]);
+        return [...previous.slice(-(MAX_POINTS - 1)), nextPoint];
+      });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [telemetry]);
+  }, []);
 
-  const current = telemetry.at(-1) || {
-    rpm: 800,
-    map_kpa: 100,
-    lambda1: 1.0,
-  };
+  const current = telemetry.at(-1) || criarTelemetriaAnterior();
 
   return (
     <main>
@@ -58,44 +117,64 @@ function App() {
       <section className="cards">
         <Card title="RPM" value={current.rpm} />
         <Card title="MAP" value={`${current.map_kpa} kPa`} />
-        <Card title="Lambda" value={current.lambda1} />
+        <Card title="Lambda" value={current.lambda1.toFixed(2)} />
       </section>
 
       <section className="chart-box">
-        <ResponsiveContainer width="100%" height={360}>
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={telemetry}>
             <CartesianGrid strokeDasharray="3 3" />
+
             <XAxis dataKey="time" />
-            <YAxis />
+
+            <YAxis
+              yAxisId="rpm"
+              domain={[0, 7000]}
+              tickCount={8}
+            />
+
+            <YAxis
+              yAxisId="map"
+              orientation="right"
+              domain={[0, 250]}
+              hide
+            />
+
             <Tooltip />
             <Legend />
+
             <Line
+              yAxisId="rpm"
               type="monotone"
               dataKey="rpm"
-              stroke="#e11d48"
+              stroke="#f11631"
+              strokeWidth={2}
               dot={false}
               name="RPM"
             />
+
             <Line
+              yAxisId="map"
               type="monotone"
               dataKey="map_kpa"
-              stroke="#2563eb"
+              stroke="#00a8ff"
+              strokeWidth={2}
               dot={false}
               name="MAP (kPa)"
             />
           </LineChart>
         </ResponsiveContainer>
       </section>
-    </main>
-  );
-}
 
-function Card({ title, value }) {
-  return (
-    <div className="card">
-      <span>{title}</span>
-      <strong>{value}</strong>
-    </div>
+      <section className="secondary-cards">
+        <Card title="TPS" value={`${current.tps} %`} />
+        <Card title="ECT" value={`${current.ect_c} °C`} />
+        <Card title="IAT" value={`${current.iat_c} °C`} />
+        <Card title="Bateria" value={`${current.battery_v} V`} />
+        <Card title="Óleo" value={`${current.oil_bar} bar`} />
+        <Card title="Combustível" value={`${current.fuel_bar} bar`} />
+      </section>
+    </main>
   );
 }
 
