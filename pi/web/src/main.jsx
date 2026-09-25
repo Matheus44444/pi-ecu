@@ -429,6 +429,51 @@ function App() {
         </ResponsiveContainer>
       </section>
 
+      <section className="selected-chart-box">
+        <div className="selected-chart-header">
+          <span>CANAL EM DETALHE</span>
+
+          <strong
+            style={{
+              color: selectedDefinition.cor,
+            }}
+          >
+            {selectedDefinition.nome}
+          </strong>
+        </div>
+
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={telemetry}>
+            <CartesianGrid strokeDasharray="3 3" />
+
+            <XAxis dataKey="time" />
+
+            <YAxis
+              domain={[
+                selectedDefinition.minimo ?? "auto",
+                selectedDefinition.maximo ?? "auto",
+              ]}
+            />
+
+            <Tooltip
+              formatter={(value) =>
+                `${Number(value).toFixed(2)} ${selectedDefinition.unidade
+                }`
+              }
+            />
+
+            <Line
+              type="monotone"
+              dataKey={selectedDefinition.id}
+              stroke={selectedDefinition.cor}
+              strokeWidth={3}
+              dot={false}
+              name={`${selectedDefinition.nome} (${selectedDefinition.unidade})`}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </section>
+
       <section className="channel-grid">
         {canais
           .filter(
