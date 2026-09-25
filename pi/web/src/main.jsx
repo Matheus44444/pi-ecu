@@ -203,6 +203,34 @@ function Card({ title, value }) {
 }
 
 function App() {
+
+  const [mainChartChannels, setMainChartChannels] =
+    useState(() => {
+      try {
+        const salvo = localStorage.getItem(
+          "pi-ecu-main-chart-channels"
+        );
+
+        const canaisSalvos = salvo
+          ? JSON.parse(salvo)
+          : ["rpm", "map_kpa"];
+
+        return Array.isArray(canaisSalvos) &&
+          canaisSalvos.length > 0
+          ? canaisSalvos.slice(0, 3)
+          : ["rpm", "map_kpa"];
+      } catch {
+        return ["rpm", "map_kpa"];
+      }
+    });
+
+  useEffect(() => {
+    localStorage.setItem(
+      "pi-ecu-main-chart-channels",
+      JSON.stringify(mainChartChannels)
+    );
+  }, [mainChartChannels]);
+  
   const [simulationValues, setSimulationValues] =
     useState(valoresPadrao);
 
@@ -304,6 +332,27 @@ function App() {
       (canal) => canal.id === selectedChannel
     ) || canais[0];
 
+  const chartChannels = canais.filter(
+    (canal) =>
+      !["rpm", "map_kpa", "lambda1"].includes(canal.id)
+  );
+  
+  function alternarCanalGrafico(canalId) {
+    setMainChartChannels((atuais) => {
+      if (atuais.includes(canalId)) {
+        return atuais.filter(
+          (id) => id !== canalId
+        );
+      }
+
+      if (atuais.length >= 3) {
+        return atuais;
+      }
+
+      return [...atuais, canalId];
+    });
+  }
+
   return (
     <main>
       <h1>Pi-ECU Dashboard</h1>
@@ -380,51 +429,104 @@ function App() {
         />
       </section>
 
+      <section className="chart-selector">
+        <div className="chart-selector-title">
+          CANAIS DO GRÁFICO PRINCIPAL
+        </div>
+
+        <div className="chart-selector-options">
+          <label className="chart-option">
+            <input
+              type="checkbox"
+              checked={mainChartChannels.includes("rpm")}
+              onChange={() =>
+                alternarCanalGrafico("rpm")
+              }
+            />
+
+            <span>RPM</span>
+          </label>
+
+          <label className="chart-option">
+            <input
+              type="checkbox"
+              checked={mainChartChannels.includes("map_kpa")}
+              onChange={() =>
+                alternarCanalGrafico("map_kpa")
+              }
+            />
+
+            <span>MAP</span>
+          </label>
+
+          <label className="chart-option">
+            <input
+              type="checkbox"
+              checked={mainChartChannels.includes("lambda1")}
+              onChange={() =>
+                alternarCanalGrafico("lambda1")
+              }
+            />
+
+            <span>LAMBDA</span>
+          </label>
+
+          {chartChannels.map((canal) => (
+            <label
+              className="chart-option"
+              key={canal.id}
+            >
+              <input
+                type="checkbox"
+                checked={mainChartChannels.includes(canal.id)}
+                onChange={() =>
+                  alternarCanalGrafico(canal.id)
+                }
+              />
+
+              <span>{canal.nome}</span>
+            </label>
+          ))}
+        </div>
+
+        <small>
+          Selecione até três canais
+        </small>
+      </section>
+
       <section className="chart-box">
-        <ResponsiveContainer
-          width="100%"
-          height="100%"
-        >
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={telemetry}>
             <CartesianGrid strokeDasharray="3 3" />
 
             <XAxis dataKey="time" />
-
-            <YAxis
-              yAxisId="rpm"
-              domain={[0, 7000]}
-              tickCount={8}
-            />
-
-            <YAxis
-              yAxisId="map"
-              orientation="right"
-              domain={[0, 250]}
-              hide
-            />
+            <YAxis />
 
             <Tooltip />
             <Legend />
 
-            <Line
-              yAxisId="rpm"
-              type="monotone"
-              dataKey="rpm"
-              stroke="#f11631"
-              strokeWidth={2}
-              dot={false}
-              name="RPM"
-            />
+            {mainChartChannels.map((canalId) => {
+              const canal = canais.find(
+                (item) => item.id === canalId
+              );
 
-            <Line
-              yAxisId="map"
-              type="monotone"
-              dataKey="map_kpa"
-              stroke="#00a8ff"
-              strokeWidth={2}
-              dot={false}
-              name="MAP (kPa)"
-            />
+              if (!canal) {
+                return null;
+              }
+
+              return (
+                <Line
+                  key={canal.id}
+                  type="monotone"
+                  dataKey={canal.id}
+                  stroke={canal.cor}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${canal.nome} (${canal.unidade})`}
+                  connectNulls
+                />
+              );
+            })}
           </LineChart>
         </ResponsiveContainer>
       </section>
