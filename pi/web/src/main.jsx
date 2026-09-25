@@ -10,6 +10,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import AlarmBanner from "./components/AlarmBanner";
+import { avaliarAlarmes } from "./utils/alarms";
+
 import "./style.css";
 
 const MAX_POINTS = 60;
@@ -86,24 +90,32 @@ function Card({ title, value }) {
 }
 
 function App() {
-  const [telemetry, setTelemetry] = useState(() => [
-    gerarTelemetria(),
-  ]);
+  const [telemetry, setTelemetry] = useState(() => [gerarTelemetria()]);
+
+  const [testeAlarme, setTesteAlarme] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTelemetry((previous) => {
         const lastPoint = previous.at(-1) || criarTelemetriaAnterior();
-        const nextPoint = gerarTelemetria(lastPoint);
+        let nextPoint = gerarTelemetria(lastPoint);
+
+        if (testeAlarme) {
+          nextPoint = {
+            ...nextPoint,
+            ect_c: Math.min(lastPoint.ect_c + 2, 115),
+          };
+        }
 
         return [...previous.slice(-(MAX_POINTS - 1)), nextPoint];
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [testeAlarme]);
 
   const current = telemetry.at(-1) || criarTelemetriaAnterior();
+  const alarms = avaliarAlarmes(current);
 
   return (
     <main>
@@ -113,6 +125,19 @@ function App() {
         <span className="led"></span>
         Modo simulação — nenhum hardware conectado
       </p>
+
+      <AlarmBanner alarms={alarms} />
+
+      <div className="simulation-controls">
+        <button
+          onClick={() => setTesteAlarme((valor) => !valor)}
+          className={testeAlarme ? "active" : ""}
+        >
+          {testeAlarme
+            ? "Parar teste de temperatura"
+            : "Testar aumento de temperatura"}
+        </button>
+      </div>
 
       <section className="cards">
         <Card title="RPM" value={current.rpm} />
@@ -127,18 +152,9 @@ function App() {
 
             <XAxis dataKey="time" />
 
-            <YAxis
-              yAxisId="rpm"
-              domain={[0, 7000]}
-              tickCount={8}
-            />
+            <YAxis yAxisId="rpm" domain={[0, 7000]} tickCount={8} />
 
-            <YAxis
-              yAxisId="map"
-              orientation="right"
-              domain={[0, 250]}
-              hide
-            />
+            <YAxis yAxisId="map" orientation="right" domain={[0, 250]} hide />
 
             <Tooltip />
             <Legend />

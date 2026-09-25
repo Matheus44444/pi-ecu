@@ -477,6 +477,52 @@ main::-webkit-scrollbar-thumb:hover {
   }
 }
 
+.simulation-controls {
+  display: flex;
+  justify-content: center;
+  padding: 0 30px 20px;
+}
+
+.simulation-controls button {
+  padding: 11px 18px;
+  border: 1px solid #3d4b57;
+  border-radius: 5px;
+  color: #dbe7ef;
+  background: #17212a;
+  cursor: pointer;
+  font-family: "Rajdhani", Arial, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: 0.2s ease;
+}
+
+.simulation-controls button:hover {
+  border-color: var(--blue);
+  color: white;
+  background: #1d3544;
+  box-shadow: 0 0 12px rgba(0, 168, 255, 0.25);
+}
+
+.simulation-controls button.active {
+  border-color: var(--red);
+  color: white;
+  background: #49131d;
+  box-shadow: 0 0 14px rgba(241, 22, 49, 0.4);
+}
+
+@media (max-width: 1024px),
+(orientation: portrait) {
+  .simulation-controls {
+    padding: 0 18px 18px;
+  }
+
+  .simulation-controls button {
+    width: 100%;
+  }
+}
+
 /* Celulares pequenos */
 @media (max-width: 480px) {
   h1 {
