@@ -578,3 +578,29 @@ main::-webkit-scrollbar-thumb:hover {
     padding: 0 12px 12px;
   }
 }
+
+.export-button {
+  display: block;
+  margin: 0 18px 16px auto;
+  padding: 9px 16px;
+  border: 1px solid var(--blue);
+  border-radius: 5px;
+  color: #dff5ff;
+  background: rgba(0, 168, 255, 0.12);
+  cursor: pointer;
+  font-family: "Rajdhani", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.export-button:hover {
+  background: rgba(0, 168, 255, 0.25);
+  box-shadow: 0 0 14px rgba(0, 168, 255, 0.3);
+}
+
+@media (max-width: 600px) {
+  .export-button {
+    width: calc(100% - 24px);
+    margin: 0 12px 16px;
+  }
+}

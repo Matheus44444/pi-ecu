@@ -1,3 +1,4 @@
+import { exportarCSV } from "./utils/csvExport";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -192,6 +193,10 @@ function App() {
           <option value="fuel">Reduzir pressão de combustível</option>
         </select>
       </div>
+
+      <button className="export-button" onClick={() => exportarCSV(telemetry)}>
+        EXPORTAR CSV
+      </button>
 
       <section className="cards">
         <Card title="RPM" value={current.rpm} />
