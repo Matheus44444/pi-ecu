@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import ReactDOM from "react-dom/client";
 import "./style.css";
 
-import downloadTelemetryCsv from "./utils/csvExport";
 import AlarmBanner from "./components/AlarmBanner";
 import ChannelDetails from "./components/ChannelDetails";
 import MetricCard from "./components/MetricCard";
 import SimulationPanel from "./components/SimulationPanel";
 import TelemetryChart from "./components/TelemetryChart";
 import channels from "./data/channels";
+import downloadTelemetryCsv from "./utils/csvExport";
 
 const DEFAULT_VALUES = {
   rpm: 2500,
@@ -23,22 +23,22 @@ const DEFAULT_VALUES = {
 };
 
 const DEFAULT_SETTINGS = {
-  mainChartChannels: ["rpm", "map_kpa"],
-  selectedChannel: "tps",
+  mainChartChannels: ["rpm"],
+  selectedChannel: "lambda1",
   showSelectedChart: false,
   showMainLegend: true,
-  showSensorCards: true,
+  showSensorCards: false,
   showGrid: true,
   maxMainChannels: 2,
 };
 
 const FALLBACK_CHANNELS = [
-  { id: "rpm", nome: "RPM", unidade: "rpm", cor: "#ff3151" },
-  { id: "map_kpa", nome: "MAP", unidade: "kPa", cor: "#16b9ff" },
-  { id: "lambda1", nome: "Lambda", unidade: "λ", cor: "#00d084" },
-  { id: "tps", nome: "TPS", unidade: "%", cor: "#b085ff" },
-  { id: "fuel_bar", nome: "Pressão de combustível", unidade: "bar", cor: "#ffd600" },
-  { id: "oil_bar", nome: "Pressão de óleo", unidade: "bar", cor: "#ff9418" },
+  { id: "rpm", nome: "RPM", unidade: "rpm", cor: "#ff173d" },
+  { id: "map_kpa", nome: "MAP", unidade: "kPa", cor: "#00baff" },
+  { id: "lambda1", nome: "Lambda", unidade: "λ", cor: "#00e58a" },
+  { id: "tps", nome: "TPS", unidade: "%", cor: "#a978ff" },
+  { id: "fuel_bar", nome: "Pressão de combustível", unidade: "bar", cor: "#ffd400" },
+  { id: "oil_bar", nome: "Pressão de óleo", unidade: "bar", cor: "#ff8017" },
   { id: "ect_c", nome: "Temperatura do motor", unidade: "°C", cor: "#ff3151" },
   { id: "iat_c", nome: "Temperatura do ar", unidade: "°C", cor: "#00d9ff" },
   { id: "battery_v", nome: "Bateria", unidade: "V", cor: "#00e676" },
@@ -59,7 +59,7 @@ function getUnit(channel) {
 }
 
 function getColor(channel) {
-  return channel?.cor || channel?.color || "#16b9ff";
+  return channel?.cor || channel?.color || "#00baff";
 }
 
 function getChannel(id) {
@@ -69,14 +69,13 @@ function getChannel(id) {
 function normalizeSettings(value) {
   const saved = value && typeof value === "object" ? value : {};
   const validIds = new Set(CHANNEL_LIST.map(getId));
-  const selected = Array.isArray(saved.mainChartChannels)
-    ? saved.mainChartChannels.filter((id) => validIds.has(id))
-    : DEFAULT_SETTINGS.mainChartChannels;
+  const savedChannels = Array.isArray(saved.mainChartChannels) ? saved.mainChartChannels.filter((id) => validIds.has(id)) : [];
+  const mainChartChannels = savedChannels.length ? savedChannels.slice(0, 4) : DEFAULT_SETTINGS.mainChartChannels;
 
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
-    mainChartChannels: selected.length ? selected.slice(0, 4) : DEFAULT_SETTINGS.mainChartChannels,
+    mainChartChannels,
     maxMainChannels: Math.max(1, Math.min(4, Number(saved.maxMainChannels) || 2)),
   };
 }
@@ -94,13 +93,14 @@ function nextTelemetry(previous) {
   const nextRpm = Math.max(700, Math.min(7000, previous.rpm + (rpmTarget - previous.rpm) * 0.12 + (Math.random() - 0.5) * 120));
   const mapTarget = 30 + nextTps * 1.7;
   const nextMap = Math.max(20, Math.min(250, previous.map_kpa + (mapTarget - previous.map_kpa) * 0.1 + (Math.random() - 0.5) * 4));
+  const nextLambda = Math.max(0.7, Math.min(1.3, 1.02 - nextTps / 100 * 0.14 + (Math.random() - 0.5) * 0.025));
 
   return {
     time: new Date().toLocaleTimeString("pt-BR"),
     rpm: Math.round(nextRpm),
     map_kpa: Number(nextMap.toFixed(1)),
     tps: Number(nextTps.toFixed(1)),
-    lambda1: Number(Math.max(0.7, Math.min(1.3, 1.02 - nextTps / 100 * 0.14 + (Math.random() - 0.5) * 0.025)).toFixed(2)),
+    lambda1: Number(nextLambda.toFixed(2)),
     fuel_bar: Number((3.25 + nextTps / 100 * 0.25 + (Math.random() - 0.5) * 0.1).toFixed(2)),
     oil_bar: Number((2.4 + nextRpm / 2300 + (Math.random() - 0.5) * 0.15).toFixed(2)),
     ect_c: Number(Math.min(120, previous.ect_c + (Math.random() - 0.45) * 0.12).toFixed(1)),
@@ -122,6 +122,8 @@ function App() {
   const [telemetry, setTelemetry] = useState(() => [initialTelemetry()]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
+  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem("pi-ecu-display-mode") === "true");
+  const [browserFullscreen, setBrowserFullscreen] = useState(Boolean(document.fullscreenElement));
   const [settings, setSettings] = useState(() => {
     try {
       return normalizeSettings(JSON.parse(localStorage.getItem("pi-ecu-dashboard-settings") || "null"));
@@ -130,7 +132,7 @@ function App() {
     }
   });
   const [simulationValues, setSimulationValues] = useState(() => ({ ...DEFAULT_VALUES }));
-  const [selectedChannel, setSelectedChannel] = useState(settings.selectedChannel || "tps");
+  const [selectedChannel, setSelectedChannel] = useState(settings.selectedChannel || "lambda1");
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -147,6 +149,36 @@ function App() {
     localStorage.setItem("pi-ecu-dashboard-settings", JSON.stringify({ ...settings, selectedChannel }));
   }, [settings, selectedChannel]);
 
+  useEffect(() => {
+    localStorage.setItem("pi-ecu-display-mode", String(displayMode));
+    document.body.classList.toggle("display-mode-active", displayMode);
+  }, [displayMode]);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setBrowserFullscreen(Boolean(document.fullscreenElement));
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === "F11") {
+        event.preventDefault();
+        setDisplayMode((current) => !current);
+      }
+
+      if (event.key === "Escape" && displayMode) {
+        setDisplayMode(false);
+      }
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [displayMode]);
+
   const current = telemetry[telemetry.length - 1] || initialTelemetry();
   const selectedDefinition = useMemo(() => getChannel(selectedChannel), [selectedChannel]);
 
@@ -157,10 +189,12 @@ function App() {
   function toggleChartChannel(id) {
     setSettings((old) => {
       const currentIds = old.mainChartChannels || [];
+
       if (currentIds.includes(id)) {
         if (currentIds.length === 1) return old;
         return { ...old, mainChartChannels: currentIds.filter((item) => item !== id) };
       }
+
       if (currentIds.length >= old.maxMainChannels) return old;
       return { ...old, mainChartChannels: [...currentIds, id] };
     });
@@ -170,6 +204,31 @@ function App() {
     setSettings(DEFAULT_SETTINGS);
     setSimulationValues(DEFAULT_VALUES);
     setSelectedChannel(DEFAULT_SETTINGS.selectedChannel);
+    setSimulationOpen(false);
+    setSettingsOpen(false);
+    setDisplayMode(false);
+  }
+
+  function toggleDisplayMode() {
+    setSettingsOpen(false);
+    setSimulationOpen(false);
+    setDisplayMode((currentMode) => !currentMode);
+  }
+
+  async function toggleBrowserFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.warn("Tela cheia indisponível:", error);
+    }
+  }
+
+  function exportCsv() {
+    downloadTelemetryCsv(telemetry, `pi-ecu-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`);
   }
 
   function renderPrimaryMetric(id) {
@@ -210,7 +269,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${displayMode ? "display-mode" : ""}`}>
       <header className="dashboard-header">
         <div>
           <div className="eyebrow">PI-ECU / LABORATÓRIO DE TELEMETRIA</div>
@@ -219,36 +278,26 @@ function App() {
         </div>
 
         <div className="header-actions">
-          <button
-            className="csv-button"
-            type="button"
-            onClick={() => {
-              downloadTelemetryCsv(
-                telemetry,
-                `pi-ecu-${new Date()
-                  .toISOString()
-                  .slice(0, 19)
-                  .replace(/:/g, "-")}.csv`
-              );
-            }}
-          >
-            ↓ EXPORTAR CSV
+          <button className="display-button" type="button" onClick={toggleDisplayMode}>
+            {displayMode ? "▣ OPERAÇÃO" : "▣ DISPLAY"}
           </button>
 
-          <button
-            className="settings-button"
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-          >
+          <button className="fullscreen-button" type="button" onClick={toggleBrowserFullscreen}>
+            {browserFullscreen ? "⛶ SAIR" : "⛶ TELA CHEIA"}
+          </button>
+
+          <button className="csv-button" type="button" onClick={exportCsv}>
+            ↓ CSV
+          </button>
+
+          <button className="settings-button" type="button" onClick={() => setSettingsOpen(true)}>
             ⚙ CONFIGURAÇÕES
           </button>
         </div>
-
       </header>
 
       <div className="system-status">
-        <span className="status-dot" />
-        SISTEMA NORMAL
+        <span className="status-dot" /> SISTEMA NORMAL
         <span className="status-divider">•</span>
         NENHUM ALARME
       </div>
@@ -256,14 +305,7 @@ function App() {
       <AlarmBanner />
 
       <section className="primary-metrics">
-        {[
-          "rpm",
-          "map_kpa",
-          "tps",
-          "lambda1",
-          "ect_c",
-          "battery_v",
-        ].map(renderPrimaryMetric)}
+        {["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].map(renderPrimaryMetric)}
       </section>
 
       <section className="section-heading">
@@ -297,7 +339,9 @@ function App() {
           </section>
 
           <section className="channel-grid">
-            {CHANNEL_LIST.filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel))).map(renderSensorCard)}
+            {CHANNEL_LIST
+              .filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel)))
+              .map(renderSensorCard)}
           </section>
         </>
       )}
@@ -312,7 +356,7 @@ function App() {
         </section>
       )}
 
-      <section className="simulation-collapsed">
+      <section className="simulation-collapsed display-mode-hidden">
         <div>
           <span className="section-kicker">CONTROLE DA SIMULAÇÃO</span>
           <strong>Parâmetros iniciais do motor</strong>
@@ -324,15 +368,17 @@ function App() {
       </section>
 
       {simulationOpen && (
-        <SimulationPanel
-          valores={simulationValues}
-          values={simulationValues}
-          onChange={setSimulationValues}
-          onApply={setSimulationValues}
-        />
+        <div className="display-mode-hidden">
+          <SimulationPanel
+            valores={simulationValues}
+            values={simulationValues}
+            onChange={setSimulationValues}
+            onApply={setSimulationValues}
+          />
+        </div>
       )}
 
-      <section className="selected-channel-footer">
+      <section className="selected-channel-footer display-mode-hidden">
         <span>CANAL SELECIONADO</span>
         <strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong>
       </section>
@@ -350,7 +396,7 @@ function App() {
 
             <section className="settings-section">
               <h3>CANAIS DO GRÁFICO PRINCIPAL</h3>
-              <p className="settings-help">Use até {settings.maxMainChannels} canais de cada vez. Para melhor leitura, combine sinais de escala semelhante.</p>
+              <p className="settings-help">Use até {settings.maxMainChannels} canais de cada vez.</p>
               <div className="settings-channel-list">
                 {CHANNEL_LIST.map((channel) => {
                   const id = getId(channel);
@@ -388,7 +434,11 @@ function App() {
               <h3>LIMITE DE CANAIS</h3>
               <select className="settings-select" value={settings.maxMainChannels} onChange={(event) => {
                 const maximum = Number(event.target.value);
-                setSettings((old) => ({ ...old, maxMainChannels: maximum, mainChartChannels: old.mainChartChannels.slice(0, maximum) }));
+                setSettings((old) => ({
+                  ...old,
+                  maxMainChannels: maximum,
+                  mainChartChannels: old.mainChartChannels.slice(0, maximum),
+                }));
               }}>
                 <option value={1}>1 canal</option>
                 <option value={2}>2 canais</option>

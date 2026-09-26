@@ -3,6 +3,7 @@
   --surface: #0b1117;
   --surface-2: #101a22;
   --surface-3: #14232c;
+  --panel-input: #09131a;
   --border: #2a4655;
   --border-hot: #3e6577;
   --white: #f3f7f8;
@@ -145,24 +146,54 @@ select:focus-visible {
   box-shadow: 0 0 10px var(--green);
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
 .settings-button,
+.display-button,
+.fullscreen-button,
+.csv-button,
 .simulation-collapsed button {
   min-height: 42px;
   border: 1px solid var(--cyan);
   border-radius: var(--radius);
-  padding: 0 17px;
+  padding: 0 14px;
   color: #e2f8ff;
   background: linear-gradient(180deg, rgba(0, 186, 255, .17), rgba(0, 186, 255, .05));
   cursor: pointer;
   font-family: "Share Tech Mono", monospace;
-  font-size: .68rem;
+  font-size: .65rem;
   font-weight: 700;
-  letter-spacing: .09em;
+  letter-spacing: .08em;
   text-transform: uppercase;
   transition: 140ms ease;
 }
 
+.display-button {
+  border-color: var(--green);
+  color: #e6fff6;
+  background: rgba(0, 229, 138, .09);
+}
+
+.fullscreen-button {
+  border-color: var(--cyan);
+}
+
+.csv-button {
+  border-color: var(--yellow);
+  color: #fff8c7;
+  background: rgba(255, 212, 0, .08);
+}
+
 .settings-button:hover,
+.display-button:hover,
+.fullscreen-button:hover,
+.csv-button:hover,
 .simulation-collapsed button:hover {
   background: rgba(0, 186, 255, .28);
   box-shadow: 0 0 20px rgba(0, 186, 255, .2);
@@ -251,7 +282,6 @@ select:focus-visible {
   font-size: clamp(1.45rem, 2.7vw, 2.05rem);
   font-weight: 700;
   line-height: 1;
-  text-shadow: 0 0 15px color-mix(in srgb, var(--metric-color, var(--cyan)) 35%, transparent);
 }
 
 .metric-card-unit {
@@ -465,7 +495,7 @@ select:focus-visible {
   border-radius: var(--radius);
   padding: 20px;
   background: var(--surface-2);
-  box-shadow: var(--shadow-panel);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .25);
 }
 
 .simulation-panel-header {
@@ -713,6 +743,59 @@ select:focus-visible {
   min-height: 40px;
 }
 
+.display-mode-hidden {
+  display: none !important;
+}
+
+.app-shell.display-mode {
+  width: 100%;
+  max-width: 1920px;
+  min-height: 100vh;
+  padding: clamp(28px, 3.5vh, 70px) clamp(32px, 4vw, 96px) 70px;
+}
+
+.display-mode .dashboard-header h1 {
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  letter-spacing: .1em;
+}
+
+.display-mode .primary-metrics {
+  gap: clamp(14px, 1.3vw, 28px);
+  margin-bottom: clamp(24px, 3vh, 48px);
+}
+
+.display-mode .primary-metrics>* {
+  min-height: clamp(150px, 17vh, 250px);
+  padding: clamp(16px, 1.7vw, 30px);
+}
+
+.display-mode .metric-card-label {
+  font-size: clamp(.7rem, 1vw, 1rem);
+}
+
+.display-mode .metric-card-value {
+  font-size: clamp(2rem, 4vw, 4.8rem);
+}
+
+.display-mode .main-chart-box {
+  height: clamp(400px, 48vh, 760px);
+  margin-bottom: clamp(24px, 3vh, 48px);
+}
+
+.display-mode .channel-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 24px);
+}
+
+.display-mode .sensor-card {
+  min-height: clamp(130px, 15vh, 230px);
+  padding: clamp(14px, 1.4vw, 28px);
+}
+
+.display-mode .sensor-card strong {
+  font-size: clamp(1.7rem, 3vw, 3.5rem);
+}
+
 @media (max-width: 1100px) {
   .app-shell {
     width: 100%;
@@ -722,6 +805,19 @@ select:focus-visible {
 
   .primary-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .header-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .header-actions button {
+    width: 100%;
+  }
+
+  .display-mode .channel-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -733,10 +829,6 @@ select:focus-visible {
   .dashboard-header {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .settings-button {
-    width: 100%;
   }
 
   .primary-metrics {
@@ -768,6 +860,18 @@ select:focus-visible {
 
   .simulation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell.display-mode {
+    padding: 20px 14px 40px;
+  }
+
+  .display-mode .primary-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .display-mode .main-chart-box {
+    height: 390px;
   }
 }
 
@@ -828,44 +932,5 @@ select:focus-visible {
     animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
-  }
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.csv-button {
-  min-height: 42px;
-  border: 1px solid var(--green);
-  border-radius: var(--radius);
-  padding: 0 15px;
-  color: #dffff0;
-  background: rgba(0, 229, 138, 0.1);
-  cursor: pointer;
-  font-family: "Share Tech Mono", monospace;
-  font-size: 0.67rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition: 140ms ease;
-}
-
-.csv-button:hover {
-  background: rgba(0, 229, 138, 0.24);
-  box-shadow: 0 0 18px rgba(0, 229, 138, 0.2);
-  transform: translateY(-1px);
-}
-
-@media (max-width: 720px) {
-  .header-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .header-actions button {
-    width: 100%;
   }
 }
