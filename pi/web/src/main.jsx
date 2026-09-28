@@ -9,6 +9,11 @@ import SimulationPanel from "./components/SimulationPanel";
 import TelemetryChart from "./components/TelemetryChart";
 import channels from "./data/channels";
 import downloadTelemetryCsv from "./utils/csvExport";
+import {
+  deleteSession,
+  listSessions,
+  saveSession,
+} from "./utils/sessionDb";
 
 const DEFAULT_VALUES = {
   rpm: 2500,
@@ -70,12 +75,11 @@ function normalizeSettings(value) {
   const saved = value && typeof value === "object" ? value : {};
   const validIds = new Set(CHANNEL_LIST.map(getId));
   const savedChannels = Array.isArray(saved.mainChartChannels) ? saved.mainChartChannels.filter((id) => validIds.has(id)) : [];
-  const mainChartChannels = savedChannels.length ? savedChannels.slice(0, 4) : DEFAULT_SETTINGS.mainChartChannels;
 
   return {
     ...DEFAULT_SETTINGS,
     ...saved,
-    mainChartChannels,
+    mainChartChannels: savedChannels.length ? savedChannels.slice(0, 4) : DEFAULT_SETTINGS.mainChartChannels,
     maxMainChannels: Math.max(1, Math.min(4, Number(saved.maxMainChannels) || 2)),
   };
 }
@@ -118,8 +122,41 @@ function displayValue(value, channel) {
   return Number(value).toFixed(1);
 }
 
+function formatSessionDuration(milliseconds) {
+  const totalSeconds = Math.floor(Math.max(0, milliseconds) / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
+
+function readSessionRows() {
+  try {
+    const saved = sessionStorage.getItem("pi-ecu-current-session");
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
 function App() {
+  const [savedSessions, setSavedSessions] = useState([]);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessionName, setSessionName] = useState("");
+  const [sessionsLoading, setSessionsLoading] = useState(false);                                                  
   const [telemetry, setTelemetry] = useState(() => [initialTelemetry()]);
+  const [sessionTelemetry, setSessionTelemetry] = useState(readSessionRows);
+  const [sessionActive, setSessionActive] = useState(true);
+  const [sessionPaused, setSessionPaused] = useState(false);
+  const [sessionNumber, setSessionNumber] = useState(() => Number(localStorage.getItem("pi-ecu-session-number") || 1));
+  const [sessionStartedAt, setSessionStartedAt] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-started-at") || Date.now()));
+  const [sessionAccumulatedMs, setSessionAccumulatedMs] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-accumulated-ms") || 0));
+  const [sessionRunStartedAt, setSessionRunStartedAt] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-run-started-at") || Date.now()));
+  const [sessionElapsed, setSessionElapsed] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-elapsed-ms") || 0));
+
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState(() => localStorage.getItem("pi-ecu-display-mode") === "true");
@@ -135,15 +172,173 @@ function App() {
   const [selectedChannel, setSelectedChannel] = useState(settings.selectedChannel || "lambda1");
 
   useEffect(() => {
+    let mounted = true;
+
+    async function loadSavedSessions() {
+      try {
+        const rows = await listSessions();
+        if (mounted) {
+          setSavedSessions(rows);
+        }
+      } catch (error) {
+        console.error(
+          "Não foi possível carregar as sessões:",
+          error
+        );
+      }
+    }
+
+    loadSavedSessions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function saveCurrentSession() {
+    const rows = sessionTelemetry.length
+      ? sessionTelemetry
+      : telemetry;
+
+    if (!rows.length) {
+      return;
+    }
+
+    setSessionsLoading(true);
+
+    try {
+      const session = {
+        id: crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random()}`,
+        number: sessionNumber,
+        name:
+          sessionName.trim() ||
+          `Sessão ${String(sessionNumber).padStart(3, "0")}`,
+        createdAt: Date.now(),
+        startedAt: sessionStartedAt,
+        durationMs: sessionElapsed,
+        sampleCount: rows.length,
+        rows,
+      };
+
+      await saveSession(session);
+      setSessionName("");
+      setSavedSessions(await listSessions());
+    } catch (error) {
+      console.error(
+        "Não foi possível salvar a sessão:",
+        error
+      );
+    } finally {
+      setSessionsLoading(false);
+    }
+  }
+
+  async function removeSavedSession(id) {
+    setSessionsLoading(true);
+
+    try {
+      await deleteSession(id);
+      setSavedSessions(await listSessions());
+    } catch (error) {
+      console.error(
+        "Não foi possível excluir a sessão:",
+        error
+      );
+    } finally {
+      setSessionsLoading(false);
+    }
+  }
+
+  function exportSavedSession(session) {
+    downloadTelemetryCsv(
+      session.rows,
+      `pi-ecu-${session.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/gi, "-")}.csv`
+    );
+  }
+
+  async function finishSession() {
+    if (!sessionActive) {
+      return;
+    }
+
+    const finalElapsed = sessionPaused
+      ? sessionAccumulatedMs
+      : sessionAccumulatedMs +
+      Date.now() - sessionRunStartedAt;
+
+    setSessionAccumulatedMs(finalElapsed);
+    setSessionElapsed(finalElapsed);
+    setSessionActive(false);
+    setSessionPaused(false);
+
+    const rows = sessionTelemetry.length
+      ? sessionTelemetry
+      : telemetry;
+
+    const session = {
+      id: crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`,
+      number: sessionNumber,
+      name:
+        sessionName.trim() ||
+        `Sessão ${String(sessionNumber).padStart(3, "0")}`,
+      createdAt: Date.now(),
+      startedAt: sessionStartedAt,
+      durationMs: finalElapsed,
+      sampleCount: rows.length,
+      rows,
+    };
+
+    try {
+      await saveSession(session);
+      setSessionName("");
+      setSavedSessions(await listSessions());
+    } catch (error) {
+      console.error(
+        "Não foi possível salvar a sessão encerrada:",
+        error
+      );
+    }
+  }
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
+      if (!sessionActive || sessionPaused) return;
+
       setTelemetry((current) => {
         const previous = current[current.length - 1] || initialTelemetry();
-        return [...current, nextTelemetry(previous)].slice(-40);
+        const next = nextTelemetry(previous);
+
+        setSessionTelemetry((rows) => {
+          const updated = [...rows, next];
+          sessionStorage.setItem("pi-ecu-current-session", JSON.stringify(updated));
+          return updated;
+        });
+
+        return [...current, next].slice(-40);
       });
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [sessionActive, sessionPaused]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (!sessionActive || sessionPaused) {
+        setSessionElapsed(sessionAccumulatedMs);
+        return;
+      }
+
+      setSessionElapsed(sessionAccumulatedMs + Date.now() - sessionRunStartedAt);
+    }, 250);
+
+    return () => window.clearInterval(timer);
+  }, [sessionActive, sessionPaused, sessionAccumulatedMs, sessionRunStartedAt]);
 
   useEffect(() => {
     localStorage.setItem("pi-ecu-dashboard-settings", JSON.stringify({ ...settings, selectedChannel }));
@@ -153,6 +348,13 @@ function App() {
     localStorage.setItem("pi-ecu-display-mode", String(displayMode));
     document.body.classList.toggle("display-mode-active", displayMode);
   }, [displayMode]);
+
+  useEffect(() => {
+    sessionStorage.setItem("pi-ecu-session-started-at", String(sessionStartedAt));
+    sessionStorage.setItem("pi-ecu-session-accumulated-ms", String(sessionAccumulatedMs));
+    sessionStorage.setItem("pi-ecu-session-run-started-at", String(sessionRunStartedAt));
+    sessionStorage.setItem("pi-ecu-session-elapsed-ms", String(sessionElapsed));
+  }, [sessionStartedAt, sessionAccumulatedMs, sessionRunStartedAt, sessionElapsed]);
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -200,6 +402,72 @@ function App() {
     });
   }
 
+  function startNewSession() {
+    const nextNumber = sessionNumber + 1;
+    const now = Date.now();
+
+    setSessionNumber(nextNumber);
+    setSessionStartedAt(now);
+    setSessionRunStartedAt(now);
+    setSessionAccumulatedMs(0);
+    setSessionElapsed(0);
+    setSessionTelemetry([]);
+    setTelemetry([initialTelemetry()]);
+    setSessionActive(true);
+    setSessionPaused(false);
+
+    localStorage.setItem("pi-ecu-session-number", String(nextNumber));
+    sessionStorage.setItem("pi-ecu-current-session", JSON.stringify([]));
+    sessionStorage.setItem("pi-ecu-session-started-at", String(now));
+    sessionStorage.setItem("pi-ecu-session-run-started-at", String(now));
+    sessionStorage.setItem("pi-ecu-session-accumulated-ms", "0");
+    sessionStorage.setItem("pi-ecu-session-elapsed-ms", "0");
+  }
+
+  function togglePauseSession() {
+    if (!sessionActive) return;
+
+    if (!sessionPaused) {
+      const accumulated = sessionAccumulatedMs + Date.now() - sessionRunStartedAt;
+      setSessionAccumulatedMs(accumulated);
+      setSessionElapsed(accumulated);
+      setSessionPaused(true);
+      return;
+    }
+
+    const resumedAt = Date.now();
+    setSessionRunStartedAt(resumedAt);
+    setSessionPaused(false);
+  }
+
+  function finishSession() {
+    if (!sessionActive) return;
+
+    const finalElapsed = sessionPaused
+      ? sessionAccumulatedMs
+      : sessionAccumulatedMs + Date.now() - sessionRunStartedAt;
+
+    setSessionAccumulatedMs(finalElapsed);
+    setSessionElapsed(finalElapsed);
+    setSessionActive(false);
+    setSessionPaused(false);
+  }
+
+  function clearSession() {
+    setSessionTelemetry([]);
+    setTelemetry([initialTelemetry()]);
+    setSessionElapsed(0);
+    setSessionAccumulatedMs(0);
+    sessionStorage.removeItem("pi-ecu-current-session");
+    sessionStorage.removeItem("pi-ecu-session-elapsed-ms");
+    sessionStorage.removeItem("pi-ecu-session-accumulated-ms");
+  }
+
+  function exportFullSession() {
+    const rows = sessionTelemetry.length ? sessionTelemetry : telemetry;
+    downloadTelemetryCsv(rows, `pi-ecu-sessao-${String(sessionNumber).padStart(3, "0")}-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`);
+  }
+
   function resetAll() {
     setSettings(DEFAULT_SETTINGS);
     setSimulationValues(DEFAULT_VALUES);
@@ -228,7 +496,7 @@ function App() {
   }
 
   function exportCsv() {
-    downloadTelemetryCsv(telemetry, `pi-ecu-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`);
+    exportFullSession();
   }
 
   function renderPrimaryMetric(id) {
@@ -278,149 +546,175 @@ function App() {
         </div>
 
         <div className="header-actions">
-          <button className="display-button" type="button" onClick={toggleDisplayMode}>
-            {displayMode ? "▣ OPERAÇÃO" : "▣ DISPLAY"}
-          </button>
-
-          <button className="fullscreen-button" type="button" onClick={toggleBrowserFullscreen}>
-            {browserFullscreen ? "⛶ SAIR" : "⛶ TELA CHEIA"}
-          </button>
-
-          <button className="csv-button" type="button" onClick={exportCsv}>
-            ↓ CSV
-          </button>
-
-          <button className="settings-button" type="button" onClick={() => setSettingsOpen(true)}>
-            ⚙ CONFIGURAÇÕES
-          </button>
+          <button className="display-button" type="button" onClick={toggleDisplayMode}>{displayMode ? "▣ OPERAÇÃO" : "▣ DISPLAY"}</button>
+          <button className="fullscreen-button" type="button" onClick={toggleBrowserFullscreen}>{browserFullscreen ? "⛶ SAIR" : "⛶ TELA CHEIA"}</button>
+          <button className="csv-button" type="button" onClick={exportCsv}>↓ CSV SESSÃO</button>
+          <button className="settings-button" type="button" onClick={() => setSettingsOpen(true)}>⚙ CONFIGURAÇÕES</button>
         </div>
       </header>
 
-      <div className="system-status">
-        <span className="status-dot" /> SISTEMA NORMAL
-        <span className="status-divider">•</span>
-        NENHUM ALARME
-      </div>
-
+      <div className="system-status"><span className="status-dot" /> SISTEMA NORMAL <span className="status-divider">•</span> NENHUM ALARME</div>
       <AlarmBanner />
 
-      <section className="primary-metrics">
-        {["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].map(renderPrimaryMetric)}
+      <section className="session-toolbar">
+        <div className="session-identity">
+          <span className="section-kicker">SESSÃO DE TESTE</span>
+          <strong>#{String(sessionNumber).padStart(3, "0")}</strong>
+          <small>{sessionActive ? sessionPaused ? "PAUSADA" : "ATIVA" : "ENCERRADA"}</small>
+        </div>
+
+        
+
+        <div className="session-stats">
+          <div><span>DURAÇÃO</span><strong>{formatSessionDuration(sessionElapsed)}</strong></div>
+          <div><span>AMOSTRAS</span><strong>{sessionTelemetry.length}</strong></div>
+        </div>
+
+        <div className="session-actions">
+          <button className="session-button session-button-primary" type="button" onClick={startNewSession}>NOVA SESSÃO</button>
+          <button className="session-button" type="button" onClick={togglePauseSession} disabled={!sessionActive}>{sessionPaused ? "RETOMAR" : "PAUSAR"}</button>
+          <button className="session-button" type="button" onClick={finishSession} disabled={!sessionActive}>ENCERRAR</button>
+          <button className="session-button session-button-export" type="button" onClick={exportFullSession} disabled={!sessionTelemetry.length && !telemetry.length}>EXPORTAR SESSÃO CSV</button>
+          <button className="session-button session-button-danger" type="button" onClick={clearSession}>LIMPAR</button>
+        </div>
       </section>
 
-      <section className="section-heading">
-        <div>
-          <span className="section-kicker">MONITORAMENTO</span>
-          <h2>Telemetria em tempo real</h2>
+      <section className="session-library-panel">
+        <div className="session-library-header">
+          <div>
+            <span className="section-kicker">
+              ARQUIVO DE TESTES
+            </span>
+            <h2>Sessões salvas</h2>
+          </div>
+
+          <button
+            className="session-button"
+            type="button"
+            onClick={() => setSessionsOpen((value) => !value)}
+          >
+            {sessionsOpen ? "OCULTAR" : "ABRIR BIBLIOTECA"}
+          </button>
         </div>
-        <span className="sample-count">{telemetry.length} amostras</span>
+
+        {sessionsOpen && (
+          <div className="session-library-content">
+            <div className="session-save-row">
+              <input
+                type="text"
+                value={sessionName}
+                onChange={(event) =>
+                  setSessionName(event.target.value)
+                }
+                placeholder="Nome do teste, ex.: marcha lenta"
+              />
+
+              <button
+                className="session-button session-button-primary"
+                type="button"
+                onClick={saveCurrentSession}
+                disabled={sessionsLoading}
+              >
+                SALVAR ATUAL
+              </button>
+            </div>
+
+            {savedSessions.length === 0 ? (
+              <p className="session-library-empty">
+                Nenhuma sessão salva ainda.
+              </p>
+            ) : (
+              <div className="saved-session-list">
+                {savedSessions.map((session) => (
+                  <article
+                    className="saved-session-item"
+                    key={session.id}
+                  >
+                    <div>
+                      <strong>{session.name}</strong>
+                      <small>
+                        Sessão #{String(session.number).padStart(3, "0")} ·{" "}
+                        {session.sampleCount} amostras ·{" "}
+                        {formatSessionDuration(session.durationMs)}
+                      </small>
+                    </div>
+
+                    <div className="saved-session-actions">
+                      <button
+                        className="session-button session-button-export"
+                        type="button"
+                        onClick={() => exportSavedSession(session)}
+                      >
+                        CSV
+                      </button>
+
+                      <button
+                        className="session-button session-button-danger"
+                        type="button"
+                        onClick={() => removeSavedSession(session.id)}
+                        disabled={sessionsLoading}
+                      >
+                        EXCLUIR
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="primary-metrics">{["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].map(renderPrimaryMetric)}</section>
+
+      <section className="section-heading">
+        <div><span className="section-kicker">MONITORAMENTO</span><h2>Telemetria em tempo real</h2></div>
+        <span className="sample-count">{telemetry.length} amostras visíveis</span>
       </section>
 
       <section className="chart-box main-chart-box">
         <div className="chart-title">LIVE TELEMETRY / CANAIS PRINCIPAIS</div>
-        <TelemetryChart
-          telemetry={telemetry}
-          data={telemetry}
-          selectedChannels={settings.mainChartChannels}
-          channels={CHANNEL_LIST}
-          showLegend={settings.showMainLegend}
-          showGrid={settings.showGrid}
-        />
+        <TelemetryChart telemetry={telemetry} data={telemetry} selectedChannels={settings.mainChartChannels} channels={CHANNEL_LIST} showLegend={settings.showMainLegend} showGrid={settings.showGrid} />
       </section>
 
       {settings.showSensorCards && (
         <>
-          <section className="section-heading compact-heading">
-            <div>
-              <span className="section-kicker">SENSORES</span>
-              <h2>Canais disponíveis</h2>
-            </div>
-            <span className="section-hint">Clique para selecionar</span>
-          </section>
-
-          <section className="channel-grid">
-            {CHANNEL_LIST
-              .filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel)))
-              .map(renderSensorCard)}
-          </section>
+          <section className="section-heading compact-heading"><div><span className="section-kicker">SENSORES</span><h2>Canais disponíveis</h2></div><span className="section-hint">Clique para selecionar</span></section>
+          <section className="channel-grid">{CHANNEL_LIST.filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel))).map(renderSensorCard)}</section>
         </>
       )}
 
       {settings.showSelectedChart && (
         <section className="selected-chart-box">
-          <div className="selected-chart-header">
-            <span>CANAL EM DETALHE</span>
-            <strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong>
-          </div>
+          <div className="selected-chart-header"><span>CANAL EM DETALHE</span><strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong></div>
           <ChannelDetails channelId={selectedChannel} telemetry={telemetry} data={current} />
         </section>
       )}
 
       <section className="simulation-collapsed display-mode-hidden">
-        <div>
-          <span className="section-kicker">CONTROLE DA SIMULAÇÃO</span>
-          <strong>Parâmetros iniciais do motor</strong>
-          <small>RPM, MAP, TPS, temperatura e pressões</small>
-        </div>
-        <button type="button" onClick={() => setSimulationOpen((value) => !value)}>
-          {simulationOpen ? "OCULTAR" : "ABRIR CONTROLES"}
-        </button>
+        <div><span className="section-kicker">CONTROLE DA SIMULAÇÃO</span><strong>Parâmetros iniciais do motor</strong><small>RPM, MAP, TPS, temperatura e pressões</small></div>
+        <button type="button" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "OCULTAR" : "ABRIR CONTROLES"}</button>
       </section>
 
-      {simulationOpen && (
-        <div className="display-mode-hidden">
-          <SimulationPanel
-            valores={simulationValues}
-            values={simulationValues}
-            onChange={setSimulationValues}
-            onApply={setSimulationValues}
-          />
-        </div>
-      )}
+      {simulationOpen && <div className="display-mode-hidden"><SimulationPanel valores={simulationValues} values={simulationValues} onChange={setSimulationValues} onApply={setSimulationValues} /></div>}
 
-      <section className="selected-channel-footer display-mode-hidden">
-        <span>CANAL SELECIONADO</span>
-        <strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong>
-      </section>
+      <section className="selected-channel-footer display-mode-hidden"><span>CANAL SELECIONADO</span><strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong></section>
 
       {settingsOpen && (
         <div className="settings-overlay" onClick={() => setSettingsOpen(false)}>
           <aside className="settings-drawer" onClick={(event) => event.stopPropagation()}>
-            <div className="settings-drawer-header">
-              <div>
-                <span>PI-ECU</span>
-                <h2>CONFIGURAÇÕES</h2>
-              </div>
-              <button className="settings-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="Fechar configurações">×</button>
-            </div>
+            <div className="settings-drawer-header"><div><span>PI-ECU</span><h2>CONFIGURAÇÕES</h2></div><button className="settings-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="Fechar configurações">×</button></div>
 
             <section className="settings-section">
               <h3>CANAIS DO GRÁFICO PRINCIPAL</h3>
               <p className="settings-help">Use até {settings.maxMainChannels} canais de cada vez.</p>
-              <div className="settings-channel-list">
-                {CHANNEL_LIST.map((channel) => {
-                  const id = getId(channel);
-                  return (
-                    <label className="settings-check-row" key={id}>
-                      <input type="checkbox" checked={settings.mainChartChannels.includes(id)} onChange={() => toggleChartChannel(id)} />
-                      <span className="channel-color" style={{ backgroundColor: getColor(channel) }} />
-                      <span>{getName(channel)}</span>
-                      <small>{getUnit(channel)}</small>
-                    </label>
-                  );
-                })}
-              </div>
+              <div className="settings-channel-list">{CHANNEL_LIST.map((channel) => { const id = getId(channel); return <label className="settings-check-row" key={id}><input type="checkbox" checked={settings.mainChartChannels.includes(id)} onChange={() => toggleChartChannel(id)} /><span className="channel-color" style={{ backgroundColor: getColor(channel) }} /><span>{getName(channel)}</span><small>{getUnit(channel)}</small></label>; })}</div>
             </section>
 
             <section className="settings-section">
               <h3>CANAL EM DETALHE</h3>
-              <select className="settings-select" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value)}>
-                {CHANNEL_LIST.map((channel) => <option key={getId(channel)} value={getId(channel)}>{getName(channel)}</option>)}
-              </select>
-              <label className="settings-check-row settings-spaced-row">
-                <input type="checkbox" checked={settings.showSelectedChart} onChange={(event) => updateSetting("showSelectedChart", event.target.checked)} />
-                <span>Mostrar canal em detalhe</span>
-              </label>
+              <select className="settings-select" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value)}>{CHANNEL_LIST.map((channel) => <option key={getId(channel)} value={getId(channel)}>{getName(channel)}</option>)}</select>
+              <label className="settings-check-row settings-spaced-row"><input type="checkbox" checked={settings.showSelectedChart} onChange={(event) => updateSetting("showSelectedChart", event.target.checked)} /><span>Mostrar canal em detalhe</span></label>
             </section>
 
             <section className="settings-section">
@@ -432,25 +726,12 @@ function App() {
 
             <section className="settings-section">
               <h3>LIMITE DE CANAIS</h3>
-              <select className="settings-select" value={settings.maxMainChannels} onChange={(event) => {
-                const maximum = Number(event.target.value);
-                setSettings((old) => ({
-                  ...old,
-                  maxMainChannels: maximum,
-                  mainChartChannels: old.mainChartChannels.slice(0, maximum),
-                }));
-              }}>
-                <option value={1}>1 canal</option>
-                <option value={2}>2 canais</option>
-                <option value={3}>3 canais</option>
-                <option value={4}>4 canais</option>
+              <select className="settings-select" value={settings.maxMainChannels} onChange={(event) => { const maximum = Number(event.target.value); setSettings((old) => ({ ...old, maxMainChannels: maximum, mainChartChannels: old.mainChartChannels.slice(0, maximum) })); }}>
+                <option value={1}>1 canal</option><option value={2}>2 canais</option><option value={3}>3 canais</option><option value={4}>4 canais</option>
               </select>
             </section>
 
-            <div className="settings-drawer-footer">
-              <button className="restore-button" type="button" onClick={resetAll}>RESTAURAR PADRÕES</button>
-              <button className="apply-button" type="button" onClick={() => setSettingsOpen(false)}>FECHAR</button>
-            </div>
+            <div className="settings-drawer-footer"><button className="restore-button" type="button" onClick={resetAll}>RESTAURAR PADRÕES</button><button className="apply-button" type="button" onClick={() => setSettingsOpen(false)}>FECHAR</button></div>
           </aside>
         </div>
       )}

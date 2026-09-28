@@ -934,3 +934,261 @@ select:focus-visible {
     transition-duration: .01ms !important;
   }
 }
+
+.session-toolbar {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cyan);
+  border-radius: var(--radius);
+  padding: 15px 18px;
+  background: linear-gradient(90deg, rgba(0, 186, 255, 0.1), transparent 64%), var(--surface-2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.session-identity {
+  display: grid;
+  gap: 3px;
+  min-width: 140px;
+}
+
+.session-identity strong {
+  color: var(--white);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 1.45rem;
+}
+
+.session-identity small {
+  color: var(--green);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.session-stats {
+  display: flex;
+  gap: 18px;
+}
+
+.session-stats div {
+  display: grid;
+  gap: 4px;
+}
+
+.session-stats span {
+  color: var(--muted);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
+.session-stats strong {
+  color: var(--cyan);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 1.05rem;
+}
+
+.session-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.session-button {
+  min-height: 32px;
+  border: 1px solid var(--border-hot);
+  border-radius: var(--radius);
+  padding: 0 10px;
+  color: var(--muted);
+  background: var(--surface-3);
+  cursor: pointer;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.session-button:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--white);
+  background: rgba(0, 186, 255, 0.14);
+}
+
+.session-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.session-button-primary {
+  border-color: var(--green);
+  color: #dffff0;
+  background: rgba(0, 229, 138, 0.1);
+}
+
+.session-button-export {
+  border-color: var(--yellow);
+  color: #fff3a6;
+  background: rgba(255, 212, 0, 0.08);
+}
+
+.session-button-danger {
+  border-color: var(--red);
+  color: #ffb9c4;
+  background: rgba(255, 23, 61, 0.08);
+}
+
+@media (max-width: 1150px) {
+  .session-toolbar {
+    grid-template-columns: auto auto;
+  }
+
+  .session-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 650px) {
+  .session-toolbar {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .session-stats {
+    justify-content: space-between;
+  }
+
+  .session-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .session-button {
+    width: 100%;
+  }
+}
+
+.session-library-panel {
+  margin: 0 0 24px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--purple);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  background: linear-gradient(90deg, rgba(169, 120, 255, 0.1), transparent 62%), var(--surface-2);
+}
+
+.session-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.session-library-header h2 {
+  margin: 5px 0 0;
+  color: var(--white);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.session-library-content {
+  margin-top: 17px;
+  border-top: 1px solid var(--border);
+  padding-top: 17px;
+}
+
+.session-save-row {
+  display: flex;
+  gap: 9px;
+  margin-bottom: 15px;
+}
+
+.session-save-row input {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--border-hot);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  color: var(--white);
+  outline: none;
+  background: var(--panel-input);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.session-save-row input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(0, 186, 255, 0.12);
+}
+
+.session-library-empty {
+  color: var(--muted);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.saved-session-list {
+  display: grid;
+  gap: 8px;
+}
+
+.saved-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 11px 12px;
+  background: rgba(0, 0, 0, 0.14);
+}
+
+.saved-session-item strong,
+.saved-session-item small {
+  display: block;
+}
+
+.saved-session-item strong {
+  color: var(--white);
+  font-size: 0.82rem;
+}
+
+.saved-session-item small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.65rem;
+}
+
+.saved-session-actions {
+  display: flex;
+  gap: 7px;
+}
+
+@media (max-width: 650px) {
+
+  .session-library-header,
+  .saved-session-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .session-library-header .session-button,
+  .session-save-row button {
+    width: 100%;
+  }
+
+  .session-save-row {
+    flex-direction: column;
+  }
+
+  .saved-session-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
