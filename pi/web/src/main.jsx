@@ -9,6 +9,7 @@ import TelemetryChart from "./components/TelemetryChart";
 import channels from "./data/channels";
 import downloadTelemetryCsv from "./utils/csvExport";
 import { avaliarAlarmes } from "./utils/alarms";
+import DashboardPage from "./pages/DashboardPage";
 
 const DEFAULT_VALUES = {
   rpm: 2500,
@@ -37,14 +38,20 @@ const FALLBACK_CHANNELS = [
   { id: "map_kpa", nome: "MAP", unidade: "kPa", cor: "#00baff" },
   { id: "lambda1", nome: "Lambda", unidade: "λ", cor: "#00e58a" },
   { id: "tps", nome: "TPS", unidade: "%", cor: "#a978ff" },
-  { id: "fuel_bar", nome: "Pressão de combustível", unidade: "bar", cor: "#ffd400" },
+  {
+    id: "fuel_bar",
+    nome: "Pressão de combustível",
+    unidade: "bar",
+    cor: "#ffd400",
+  },
   { id: "oil_bar", nome: "Pressão de óleo", unidade: "bar", cor: "#ff8017" },
   { id: "ect_c", nome: "Temperatura do motor", unidade: "°C", cor: "#ff3151" },
   { id: "iat_c", nome: "Temperatura do ar", unidade: "°C", cor: "#00d9ff" },
   { id: "battery_v", nome: "Bateria", unidade: "V", cor: "#00e676" },
 ];
 
-const CHANNEL_LIST = Array.isArray(channels) && channels.length ? channels : FALLBACK_CHANNELS;
+const CHANNEL_LIST =
+  Array.isArray(channels) && channels.length ? channels : FALLBACK_CHANNELS;
 
 function getId(channel) {
   return channel?.id || channel?.key || channel?.name;
@@ -102,16 +109,29 @@ function nextTelemetry(previous, override, manual) {
     return initialTelemetry({ ...DEFAULT_VALUES, ...override });
   }
 
-  const tps = Math.max(0, Math.min(100, previous.tps + (Math.random() - 0.5) * 4));
+  const tps = Math.max(
+    0,
+    Math.min(100, previous.tps + (Math.random() - 0.5) * 4),
+  );
   const rpmTarget = 850 + tps * 42;
   const rpm = Math.max(
     700,
-    Math.min(7000, previous.rpm + (rpmTarget - previous.rpm) * 0.12 + (Math.random() - 0.5) * 120),
+    Math.min(
+      7000,
+      previous.rpm +
+        (rpmTarget - previous.rpm) * 0.12 +
+        (Math.random() - 0.5) * 120,
+    ),
   );
   const mapTarget = 30 + tps * 1.7;
   const map = Math.max(
     20,
-    Math.min(250, previous.map_kpa + (mapTarget - previous.map_kpa) * 0.1 + (Math.random() - 0.5) * 4),
+    Math.min(
+      250,
+      previous.map_kpa +
+        (mapTarget - previous.map_kpa) * 0.1 +
+        (Math.random() - 0.5) * 4,
+    ),
   );
 
   return {
@@ -119,10 +139,18 @@ function nextTelemetry(previous, override, manual) {
     rpm: Math.round(rpm),
     map_kpa: Number(map.toFixed(1)),
     tps: Number(tps.toFixed(1)),
-    lambda1: Number((1.02 - (tps / 100) * 0.14 + (Math.random() - 0.5) * 0.025).toFixed(2)),
-    fuel_bar: Number((3.25 + (tps / 100) * 0.25 + (Math.random() - 0.5) * 0.1).toFixed(2)),
-    oil_bar: Number((2.4 + rpm / 2300 + (Math.random() - 0.5) * 0.15).toFixed(2)),
-    ect_c: Number(Math.min(120, previous.ect_c + (Math.random() - 0.45) * 0.12).toFixed(1)),
+    lambda1: Number(
+      (1.02 - (tps / 100) * 0.14 + (Math.random() - 0.5) * 0.025).toFixed(2),
+    ),
+    fuel_bar: Number(
+      (3.25 + (tps / 100) * 0.25 + (Math.random() - 0.5) * 0.1).toFixed(2),
+    ),
+    oil_bar: Number(
+      (2.4 + rpm / 2300 + (Math.random() - 0.5) * 0.15).toFixed(2),
+    ),
+    ect_c: Number(
+      Math.min(120, previous.ect_c + (Math.random() - 0.45) * 0.12).toFixed(1),
+    ),
     iat_c: Number((30 + (tps / 100) * 16 + (Math.random() - 0.5)).toFixed(1)),
     battery_v: Number((13.7 + (Math.random() - 0.5) * 0.2).toFixed(2)),
   };
@@ -158,35 +186,65 @@ function App() {
   const [sessionTelemetry, setSessionTelemetry] = useState(readSessionRows);
   const [sessionActive, setSessionActive] = useState(true);
   const [sessionPaused, setSessionPaused] = useState(false);
-  const [sessionNumber, setSessionNumber] = useState(() => Number(localStorage.getItem("pi-ecu-session-number") || 1));
-  const [sessionStartedAt, setSessionStartedAt] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-started-at") || Date.now()));
-  const [sessionAccumulatedMs, setSessionAccumulatedMs] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-accumulated-ms") || 0));
-  const [sessionRunStartedAt, setSessionRunStartedAt] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-run-started-at") || Date.now()));
-  const [sessionElapsed, setSessionElapsed] = useState(() => Number(sessionStorage.getItem("pi-ecu-session-elapsed-ms") || 0));
+  const [sessionNumber, setSessionNumber] = useState(() =>
+    Number(localStorage.getItem("pi-ecu-session-number") || 1),
+  );
+  const [sessionStartedAt, setSessionStartedAt] = useState(() =>
+    Number(sessionStorage.getItem("pi-ecu-session-started-at") || Date.now()),
+  );
+  const [sessionAccumulatedMs, setSessionAccumulatedMs] = useState(() =>
+    Number(sessionStorage.getItem("pi-ecu-session-accumulated-ms") || 0),
+  );
+  const [sessionRunStartedAt, setSessionRunStartedAt] = useState(() =>
+    Number(
+      sessionStorage.getItem("pi-ecu-session-run-started-at") || Date.now(),
+    ),
+  );
+  const [sessionElapsed, setSessionElapsed] = useState(() =>
+    Number(sessionStorage.getItem("pi-ecu-session-elapsed-ms") || 0),
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [simulationOpen, setSimulationOpen] = useState(false);
-  const [displayMode, setDisplayMode] = useState(() => localStorage.getItem("pi-ecu-display-mode") === "true");
-  const [browserFullscreen, setBrowserFullscreen] = useState(Boolean(document.fullscreenElement));
+  const [displayMode, setDisplayMode] = useState(
+    () => localStorage.getItem("pi-ecu-display-mode") === "true",
+  );
+  const [browserFullscreen, setBrowserFullscreen] = useState(
+    Boolean(document.fullscreenElement),
+  );
   const [settings, setSettings] = useState(() => {
     try {
-      return normalizeSettings(JSON.parse(localStorage.getItem("pi-ecu-dashboard-settings") || "null"));
+      return normalizeSettings(
+        JSON.parse(localStorage.getItem("pi-ecu-dashboard-settings") || "null"),
+      );
     } catch {
       return DEFAULT_SETTINGS;
     }
   });
-  const [simulationValues, setSimulationValues] = useState(() => ({ ...DEFAULT_VALUES }));
+  const [simulationValues, setSimulationValues] = useState(() => ({
+    ...DEFAULT_VALUES,
+  }));
   const [manualSimulation, setManualSimulation] = useState(false);
-  const [selectedChannel, setSelectedChannel] = useState(settings.selectedChannel || "lambda1");
+  const [selectedChannel, setSelectedChannel] = useState(
+    settings.selectedChannel || "lambda1",
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (!sessionActive || sessionPaused) return;
       setTelemetry((currentRows) => {
-        const previous = currentRows[currentRows.length - 1] || initialTelemetry();
-        const next = nextTelemetry(previous, simulationValues, manualSimulation);
+        const previous =
+          currentRows[currentRows.length - 1] || initialTelemetry();
+        const next = nextTelemetry(
+          previous,
+          simulationValues,
+          manualSimulation,
+        );
         setSessionTelemetry((rows) => {
           const updated = [...rows, next];
-          sessionStorage.setItem("pi-ecu-current-session", JSON.stringify(updated));
+          sessionStorage.setItem(
+            "pi-ecu-current-session",
+            JSON.stringify(updated),
+          );
           return updated;
         });
         return [...currentRows, next].slice(-40);
@@ -197,14 +255,21 @@ function App() {
 
   useEffect(() => {
     const timer = window.setInterval(() => {
-      if (!sessionActive || sessionPaused) setSessionElapsed(sessionAccumulatedMs);
-      else setSessionElapsed(sessionAccumulatedMs + Date.now() - sessionRunStartedAt);
+      if (!sessionActive || sessionPaused)
+        setSessionElapsed(sessionAccumulatedMs);
+      else
+        setSessionElapsed(
+          sessionAccumulatedMs + Date.now() - sessionRunStartedAt,
+        );
     }, 250);
     return () => window.clearInterval(timer);
   }, [sessionActive, sessionPaused, sessionAccumulatedMs, sessionRunStartedAt]);
 
   useEffect(() => {
-    localStorage.setItem("pi-ecu-dashboard-settings", JSON.stringify({ ...settings, selectedChannel }));
+    localStorage.setItem(
+      "pi-ecu-dashboard-settings",
+      JSON.stringify({ ...settings, selectedChannel }),
+    );
   }, [settings, selectedChannel]);
 
   useEffect(() => {
@@ -213,21 +278,39 @@ function App() {
   }, [displayMode]);
 
   useEffect(() => {
-    sessionStorage.setItem("pi-ecu-session-started-at", String(sessionStartedAt));
-    sessionStorage.setItem("pi-ecu-session-accumulated-ms", String(sessionAccumulatedMs));
-    sessionStorage.setItem("pi-ecu-session-run-started-at", String(sessionRunStartedAt));
+    sessionStorage.setItem(
+      "pi-ecu-session-started-at",
+      String(sessionStartedAt),
+    );
+    sessionStorage.setItem(
+      "pi-ecu-session-accumulated-ms",
+      String(sessionAccumulatedMs),
+    );
+    sessionStorage.setItem(
+      "pi-ecu-session-run-started-at",
+      String(sessionRunStartedAt),
+    );
     sessionStorage.setItem("pi-ecu-session-elapsed-ms", String(sessionElapsed));
-  }, [sessionStartedAt, sessionAccumulatedMs, sessionRunStartedAt, sessionElapsed]);
+  }, [
+    sessionStartedAt,
+    sessionAccumulatedMs,
+    sessionRunStartedAt,
+    sessionElapsed,
+  ]);
 
   useEffect(() => {
-    const listener = () => setBrowserFullscreen(Boolean(document.fullscreenElement));
+    const listener = () =>
+      setBrowserFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", listener);
     return () => document.removeEventListener("fullscreenchange", listener);
   }, []);
 
   const current = telemetry[telemetry.length - 1] || initialTelemetry();
   const activeAlarms = useMemo(() => avaliarAlarmes(current), [current]);
-  const selectedDefinition = useMemo(() => getChannel(selectedChannel), [selectedChannel]);
+  const selectedDefinition = useMemo(
+    () => getChannel(selectedChannel),
+    [selectedChannel],
+  );
 
   function applySimulation(values) {
     const next = { ...DEFAULT_VALUES, ...values };
@@ -243,7 +326,10 @@ function App() {
   function toggleChartChannel(id) {
     setSettings((old) => {
       const ids = old.mainChartChannels || [];
-      if (ids.includes(id)) return ids.length === 1 ? old : { ...old, mainChartChannels: ids.filter((item) => item !== id) };
+      if (ids.includes(id))
+        return ids.length === 1
+          ? old
+          : { ...old, mainChartChannels: ids.filter((item) => item !== id) };
       if (ids.length >= old.maxMainChannels) return old;
       return { ...old, mainChartChannels: [...ids, id] };
     });
@@ -251,7 +337,10 @@ function App() {
 
   function exportFullSession() {
     const rows = sessionTelemetry.length ? sessionTelemetry : telemetry;
-    downloadTelemetryCsv(rows, `pi-ecu-sessao-${String(sessionNumber).padStart(3, "0")}.csv`);
+    downloadTelemetryCsv(
+      rows,
+      `pi-ecu-sessao-${String(sessionNumber).padStart(3, "0")}.csv`,
+    );
   }
 
   function startNewSession() {
@@ -285,7 +374,9 @@ function App() {
 
   function finishSession() {
     if (!sessionActive) return;
-    const elapsed = sessionPaused ? sessionAccumulatedMs : sessionAccumulatedMs + Date.now() - sessionRunStartedAt;
+    const elapsed = sessionPaused
+      ? sessionAccumulatedMs
+      : sessionAccumulatedMs + Date.now() - sessionRunStartedAt;
     setSessionAccumulatedMs(elapsed);
     setSessionElapsed(elapsed);
     setSessionActive(false);
@@ -302,7 +393,8 @@ function App() {
 
   async function toggleBrowserFullscreen() {
     try {
-      if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+      if (!document.fullscreenElement)
+        await document.documentElement.requestFullscreen();
       else await document.exitFullscreen();
     } catch (error) {
       console.warn(error);
@@ -311,43 +403,292 @@ function App() {
 
   function renderPrimaryMetric(id) {
     const channel = getChannel(id);
-    return <MetricCard key={id} canal={channel} channel={channel} title={getName(channel)} label={getName(channel)} value={displayValue(current[id], channel)} unit={getUnit(channel)} color={getColor(channel)} />;
+    return (
+      <MetricCard
+        key={id}
+        canal={channel}
+        channel={channel}
+        title={getName(channel)}
+        label={getName(channel)}
+        value={displayValue(current[id], channel)}
+        unit={getUnit(channel)}
+        color={getColor(channel)}
+      />
+    );
   }
 
   function renderSensorCard(channel) {
     const id = getId(channel);
-    return <button className={`sensor-card ${selectedChannel === id ? "active" : ""}`} key={id} type="button" onClick={() => setSelectedChannel(id)} style={{ "--channel-color": getColor(channel) }}><span className="sensor-card-label">{getName(channel)}</span><strong>{displayValue(current[id], channel)}</strong><small>{getUnit(channel)}</small><em>CLIQUE PARA SELECIONAR</em></button>;
+    return (
+      <button
+        className={`sensor-card ${selectedChannel === id ? "active" : ""}`}
+        key={id}
+        type="button"
+        onClick={() => setSelectedChannel(id)}
+        style={{ "--channel-color": getColor(channel) }}
+      >
+        <span className="sensor-card-label">{getName(channel)}</span>
+        <strong>{displayValue(current[id], channel)}</strong>
+        <small>{getUnit(channel)}</small>
+        <em>CLIQUE PARA SELECIONAR</em>
+      </button>
+    );
   }
 
   return (
     <main className={`app-shell ${displayMode ? "display-mode" : ""}`}>
-      <header className="dashboard-header"><div><div className="eyebrow">PI-ECU / LABORATÓRIO DE TELEMETRIA</div><h1>PI-ECU DASHBOARD</h1><p className="connection-status"><span className="status-dot" /> MODO SIMULAÇÃO — NENHUM HARDWARE CONECTADO</p></div><div className="header-actions"><button className="display-button" type="button" onClick={() => setDisplayMode((value) => !value)}>▣ DISPLAY</button><button className="fullscreen-button" type="button" onClick={toggleBrowserFullscreen}>⛶ TELA CHEIA</button><button className="csv-button" type="button" onClick={exportFullSession}>↓ CSV SESSÃO</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)}>⚙ CONFIGURAÇÕES</button></div></header>
+      <header className="dashboard-header">
+        <div>
+          <div className="eyebrow">PI-ECU / LABORATÓRIO DE TELEMETRIA</div>
+          <h1>PI-ECU DASHBOARD</h1>
+          <p className="connection-status">
+            <span className="status-dot" /> MODO SIMULAÇÃO — NENHUM HARDWARE
+            CONECTADO
+          </p>
+        </div>
+        <div className="header-actions">
+          <button
+            className="display-button"
+            type="button"
+            onClick={() => setDisplayMode((value) => !value)}
+          >
+            ▣ DISPLAY
+          </button>
+          <button
+            className="fullscreen-button"
+            type="button"
+            onClick={toggleBrowserFullscreen}
+          >
+            ⛶ TELA CHEIA
+          </button>
+          <button
+            className="csv-button"
+            type="button"
+            onClick={exportFullSession}
+          >
+            ↓ CSV SESSÃO
+          </button>
+          <button
+            className="settings-button"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+          >
+            ⚙ CONFIGURAÇÕES
+          </button>
+        </div>
+      </header>
 
-      <div className={`system-status ${activeAlarms.length ? "system-status-alarm" : ""}`}><span className="status-dot" />{activeAlarms.length ? `${activeAlarms.length} ALARME${activeAlarms.length > 1 ? "S" : ""} ATIVO${activeAlarms.length > 1 ? "S" : ""}` : "SISTEMA NORMAL"}<span className="status-divider">•</span>{activeAlarms.length ? activeAlarms[0].mensagem : "NENHUM ALARME"}</div>
-      <AlarmBanner alarms={activeAlarms} alarmes={activeAlarms} telemetry={current} />
+      <div
+        className={`system-status ${activeAlarms.length ? "system-status-alarm" : ""}`}
+      >
+        <span className="status-dot" />
+        {activeAlarms.length
+          ? `${activeAlarms.length} ALARME${activeAlarms.length > 1 ? "S" : ""} ATIVO${activeAlarms.length > 1 ? "S" : ""}`
+          : "SISTEMA NORMAL"}
+        <span className="status-divider">•</span>
+        {activeAlarms.length ? activeAlarms[0].mensagem : "NENHUM ALARME"}
+      </div>
+      <AlarmBanner
+        alarms={activeAlarms}
+        alarmes={activeAlarms}
+        telemetry={current}
+      />
 
-      <section className="session-toolbar"><div className="session-identity"><span className="section-kicker">SESSÃO DE TESTE</span><strong>#{String(sessionNumber).padStart(3, "0")}</strong><small>{sessionActive ? sessionPaused ? "PAUSADA" : "ATIVA" : "ENCERRADA"}</small></div><div className="session-stats"><div><span>DURAÇÃO</span><strong>{formatSessionDuration(sessionElapsed)}</strong></div><div><span>AMOSTRAS</span><strong>{sessionTelemetry.length}</strong></div></div><div className="session-actions"><button className="session-button session-button-primary" type="button" onClick={startNewSession}>NOVA SESSÃO</button><button className="session-button" type="button" onClick={togglePauseSession} disabled={!sessionActive}>{sessionPaused ? "RETOMAR" : "PAUSAR"}</button><button className="session-button" type="button" onClick={finishSession} disabled={!sessionActive}>ENCERRAR</button><button className="session-button session-button-export" type="button" onClick={exportFullSession}>EXPORTAR SESSÃO CSV</button><button className="session-button session-button-danger" type="button" onClick={clearSession}>LIMPAR</button></div></section>
-
-      <section className="primary-metrics">{["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].map(renderPrimaryMetric)}</section>
-      <section className="section-heading"><div><span className="section-kicker">MONITORAMENTO</span><h2>Telemetria em tempo real</h2></div><span className="sample-count">{telemetry.length} amostras visíveis</span></section>
-      <section className="chart-box main-chart-box"><div className="chart-title">LIVE TELEMETRY / CANAIS PRINCIPAIS</div><TelemetryChart telemetry={telemetry} data={telemetry} selectedChannels={settings.mainChartChannels} channels={CHANNEL_LIST} showLegend={settings.showMainLegend} showGrid={settings.showGrid} /></section>
-
-      {settings.showSensorCards && <><section className="section-heading compact-heading"><div><span className="section-kicker">SENSORES</span><h2>Canais disponíveis</h2></div><span className="section-hint">Clique para selecionar</span></section><section className="channel-grid">{CHANNEL_LIST.filter((channel) => !["rpm", "map_kpa", "tps", "lambda1", "ect_c", "battery_v"].includes(getId(channel))).map(renderSensorCard)}</section></>}
-      {settings.showSelectedChart && <section className="selected-chart-box"><div className="selected-chart-header"><span>CANAL EM DETALHE</span><strong style={{ color: getColor(selectedDefinition) }}>{getName(selectedDefinition)}</strong></div><ChannelDetails
-        channelId={selectedChannel}
-        channel={selectedDefinition}
+      <DashboardPage
         telemetry={telemetry}
-        data={current}
-        values={current}
-        value={current[selectedChannel]}
-      /></section>}
+        current={current}
+        settings={settings}
+        activeAlarms={activeAlarms}
+        sessionNumber={sessionNumber}
+        sessionElapsed={formatSessionDuration(sessionElapsed)}
+        sessionTelemetry={sessionTelemetry}
+        channels={CHANNEL_LIST}
+        selectedChannel={selectedChannel}
+        selectedDefinition={selectedDefinition}
+        onNewSession={startNewSession}
+        onPauseSession={togglePauseSession}
+        onFinishSession={finishSession}
+        onClearSession={clearSession}
+        onExportSession={exportFullSession}
+        onSelectChannel={setSelectedChannel}
+      />
 
-      <section className="simulation-collapsed"><div><span className="section-kicker">CONTROLE DA SIMULAÇÃO</span><strong>Parâmetros iniciais do motor</strong><small>RPM, MAP, TPS, temperatura e pressões</small></div><button type="button" onClick={() => setSimulationOpen((value) => !value)}>{simulationOpen ? "OCULTAR" : "ABRIR CONTROLES"}</button></section>
-      {simulationOpen && <div className="simulation-panel-wrapper"><SimulationPanel valores={simulationValues} values={simulationValues} onChange={setSimulationValues} onApply={applySimulation} /></div>}
+      <section className="simulation-collapsed">
+        <div>
+          <span className="section-kicker">CONTROLE DA SIMULAÇÃO</span>
+          <strong>Parâmetros iniciais do motor</strong>
+          <small>RPM, MAP, TPS, temperatura e pressões</small>
+        </div>
 
-      {settingsOpen && <div className="settings-overlay" onClick={() => setSettingsOpen(false)}><aside className="settings-drawer" onClick={(event) => event.stopPropagation()}><div className="settings-drawer-header"><div><span>PI-ECU</span><h2>CONFIGURAÇÕES</h2></div><button className="settings-close" type="button" onClick={() => setSettingsOpen(false)}>×</button></div><section className="settings-section"><h3>CANAIS DO GRÁFICO PRINCIPAL</h3><p className="settings-help">Use até {settings.maxMainChannels} canais de cada vez.</p><div className="settings-channel-list">{CHANNEL_LIST.map((channel) => { const id = getId(channel); return <label className="settings-check-row" key={id}><input type="checkbox" checked={settings.mainChartChannels.includes(id)} onChange={() => toggleChartChannel(id)} /><span className="channel-color" style={{ backgroundColor: getColor(channel) }} /><span>{getName(channel)}</span><small>{getUnit(channel)}</small></label>; })}</div></section><section className="settings-section"><h3>CANAL EM DETALHE</h3><select className="settings-select" value={selectedChannel} onChange={(event) => setSelectedChannel(event.target.value)}>{CHANNEL_LIST.map((channel) => <option key={getId(channel)} value={getId(channel)}>{getName(channel)}</option>)}</select><label className="settings-check-row settings-spaced-row"><input type="checkbox" checked={settings.showSelectedChart} onChange={(event) => updateSetting("showSelectedChart", event.target.checked)} /><span>Mostrar canal em detalhe</span></label></section><section className="settings-section"><h3>ELEMENTOS DA TELA</h3><label className="settings-check-row"><input type="checkbox" checked={settings.showMainLegend} onChange={(event) => updateSetting("showMainLegend", event.target.checked)} /><span>Mostrar legenda do gráfico</span></label><label className="settings-check-row"><input type="checkbox" checked={settings.showSensorCards} onChange={(event) => updateSetting("showSensorCards", event.target.checked)} /><span>Mostrar sensores secundários</span></label><label className="settings-check-row"><input type="checkbox" checked={settings.showGrid} onChange={(event) => updateSetting("showGrid", event.target.checked)} /><span>Mostrar grade do gráfico</span></label></section><section className="settings-section"><h3>LIMITE DE CANAIS</h3><select className="settings-select" value={settings.maxMainChannels} onChange={(event) => { const maximum = Number(event.target.value); setSettings((old) => ({ ...old, maxMainChannels: maximum, mainChartChannels: old.mainChartChannels.slice(0, maximum) })); }}><option value={1}>1 canal</option><option value={2}>2 canais</option><option value={3}>3 canais</option><option value={4}>4 canais</option></select></section><div className="settings-drawer-footer"><button className="restore-button" type="button" onClick={() => setSettings(DEFAULT_SETTINGS)}>RESTAURAR PADRÕES</button><button className="apply-button" type="button" onClick={() => setSettingsOpen(false)}>FECHAR</button></div></aside></div>}
+        <button
+          type="button"
+          onClick={() => setSimulationOpen((value) => !value)}
+        >
+          {simulationOpen ? "OCULTAR" : "ABRIR CONTROLES"}
+        </button>
+      </section>
+
+      {simulationOpen && (
+        <div className="simulation-panel-wrapper">
+          <SimulationPanel
+            valores={simulationValues}
+            values={simulationValues}
+            onChange={setSimulationValues}
+            onApply={applySimulation}
+          />
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div
+          className="settings-overlay"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <aside
+            className="settings-drawer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="settings-drawer-header">
+              <div>
+                <span>PI-ECU</span>
+                <h2>CONFIGURAÇÕES</h2>
+              </div>
+              <button
+                className="settings-close"
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <section className="settings-section">
+              <h3>CANAIS DO GRÁFICO PRINCIPAL</h3>
+              <p className="settings-help">
+                Use até {settings.maxMainChannels} canais de cada vez.
+              </p>
+              <div className="settings-channel-list">
+                {CHANNEL_LIST.map((channel) => {
+                  const id = getId(channel);
+                  return (
+                    <label className="settings-check-row" key={id}>
+                      <input
+                        type="checkbox"
+                        checked={settings.mainChartChannels.includes(id)}
+                        onChange={() => toggleChartChannel(id)}
+                      />
+                      <span
+                        className="channel-color"
+                        style={{ backgroundColor: getColor(channel) }}
+                      />
+                      <span>{getName(channel)}</span>
+                      <small>{getUnit(channel)}</small>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+            <section className="settings-section">
+              <h3>CANAL EM DETALHE</h3>
+              <select
+                className="settings-select"
+                value={selectedChannel}
+                onChange={(event) => setSelectedChannel(event.target.value)}
+              >
+                {CHANNEL_LIST.map((channel) => (
+                  <option key={getId(channel)} value={getId(channel)}>
+                    {getName(channel)}
+                  </option>
+                ))}
+              </select>
+              <label className="settings-check-row settings-spaced-row">
+                <input
+                  type="checkbox"
+                  checked={settings.showSelectedChart}
+                  onChange={(event) =>
+                    updateSetting("showSelectedChart", event.target.checked)
+                  }
+                />
+                <span>Mostrar canal em detalhe</span>
+              </label>
+            </section>
+            <section className="settings-section">
+              <h3>ELEMENTOS DA TELA</h3>
+              <label className="settings-check-row">
+                <input
+                  type="checkbox"
+                  checked={settings.showMainLegend}
+                  onChange={(event) =>
+                    updateSetting("showMainLegend", event.target.checked)
+                  }
+                />
+                <span>Mostrar legenda do gráfico</span>
+              </label>
+              <label className="settings-check-row">
+                <input
+                  type="checkbox"
+                  checked={settings.showSensorCards}
+                  onChange={(event) =>
+                    updateSetting("showSensorCards", event.target.checked)
+                  }
+                />
+                <span>Mostrar sensores secundários</span>
+              </label>
+              <label className="settings-check-row">
+                <input
+                  type="checkbox"
+                  checked={settings.showGrid}
+                  onChange={(event) =>
+                    updateSetting("showGrid", event.target.checked)
+                  }
+                />
+                <span>Mostrar grade do gráfico</span>
+              </label>
+            </section>
+            <section className="settings-section">
+              <h3>LIMITE DE CANAIS</h3>
+              <select
+                className="settings-select"
+                value={settings.maxMainChannels}
+                onChange={(event) => {
+                  const maximum = Number(event.target.value);
+                  setSettings((old) => ({
+                    ...old,
+                    maxMainChannels: maximum,
+                    mainChartChannels: old.mainChartChannels.slice(0, maximum),
+                  }));
+                }}
+              >
+                <option value={1}>1 canal</option>
+                <option value={2}>2 canais</option>
+                <option value={3}>3 canais</option>
+                <option value={4}>4 canais</option>
+              </select>
+            </section>
+            <div className="settings-drawer-footer">
+              <button
+                className="restore-button"
+                type="button"
+                onClick={() => setSettings(DEFAULT_SETTINGS)}
+              >
+                RESTAURAR PADRÕES
+              </button>
+              <button
+                className="apply-button"
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+              >
+                FECHAR
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </main>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<React.StrictMode><App /></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
