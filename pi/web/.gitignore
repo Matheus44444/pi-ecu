@@ -16,3 +16,10 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Backups locais do projeto
+backups/
+**/*.backup
+**/*.backup-*
+**/*.bak
+**/*.old
