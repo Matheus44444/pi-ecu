@@ -1,68 +1,55 @@
-export default function ChannelDetails({ canal, valor, historico }) {
-    if (!canal) {
-        return (
-            <section className="channel-details empty-details">
-                Selecione um canal para visualizar detalhes
-            </section>
-        );
-    }
+import TelemetryChart from "./TelemetryChart";
 
-    const valores = historico
-        .map((item) => Number(item[canal.id]))
-        .filter((item) => Number.isFinite(item));
+export default function ChannelDetails({
+    channelId,
+    channel,
+    telemetry = [],
+    data = {},
+    values = {},
+}) {
+    const current = data || values || {};
+    const value = current[channelId];
 
-    const minimo = valores.length > 0 ? Math.min(...valores) : 0;
+    const name =
+        channel?.nome ||
+        channel?.label ||
+        channel?.name ||
+        channelId;
 
-    const maximo = valores.length > 0 ? Math.max(...valores) : 0;
+    const unit =
+        channel?.unidade ||
+        channel?.unit ||
+        "";
 
-    const media =
-        valores.length > 0
-            ? valores.reduce((a, b) => a + b, 0) / valores.length
-            : 0;
+    const color =
+        channel?.cor ||
+        channel?.color ||
+        "#00baff";
 
     return (
-        <section className="channel-details">
-            <div className="details-header">
-                <div>
-                    <span>CANAL SELECIONADO</span>
-                    <h2>{canal.nome}</h2>
-                </div>
+        <div className="channel-details-content">
+            <div className="channel-details-value">
+                <span>VALOR ATUAL</span>
 
-                <strong style={{ color: canal.cor }}>
-                    {Number(valor).toFixed(1)} {canal.unidade}
+                <strong style={{ color }}>
+                    {value === undefined || value === null
+                        ? "—"
+                        : Number(value).toFixed(1)}
                 </strong>
+
+                <small>{unit}</small>
             </div>
 
-            <div className="details-grid">
-                <div>
-                    <span>MÍNIMO</span>
-                    <strong>{minimo.toFixed(1)}</strong>
-                </div>
-
-                <div>
-                    <span>MÁXIMO</span>
-                    <strong>{maximo.toFixed(1)}</strong>
-                </div>
-
-                <div>
-                    <span>MÉDIA</span>
-                    <strong>{media.toFixed(1)}</strong>
-                </div>
-
-                <div>
-                    <span>AMOSTRAS</span>
-                    <strong>{valores.length}</strong>
-                </div>
+            <div className="channel-details-chart">
+                <TelemetryChart
+                    telemetry={telemetry}
+                    data={telemetry}
+                    selectedChannels={[channelId]}
+                    channels={channel ? [channel] : []}
+                    showLegend
+                    showGrid
+                />
             </div>
-
-            <div className="range-info">
-                {canal.normalMin !== undefined && canal.normalMax !== undefined && (
-                    <span>
-                        Faixa normal: {canal.normalMin} até {canal.normalMax}{" "}
-                        {canal.unidade}
-                    </span>
-                )}
-            </div>
-        </section>
+        </div>
     );
 }

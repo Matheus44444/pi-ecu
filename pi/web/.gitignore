@@ -1,0 +1,18 @@
+# Backups locais
+*.backup
+*.backup-*
+*.bak
+*.old
+
+# Dependências e build
+node_modules/
+dist/
+
+# Ambiente Python
+.venv/
+venv/
+
+# Arquivos locais
+.env
+.env.*
+!.env.example
