@@ -37,6 +37,7 @@ export default function DashboardPage({
     activeAlarms = [],
     sessionNumber,
     sessionElapsed,
+    sessionPaused = false,
     sessionTelemetry = [],
     channels = [],
     selectedChannel,
@@ -84,23 +85,44 @@ export default function DashboardPage({
                 </div>
 
                 <div className="session-actions">
-                    <button type="button" onClick={onNewSession}>
+                    <button
+                        className="session-button session-button-primary"
+                        type="button"
+                        onClick={onNewSession}
+                    >
                         NOVA SESSÃO
                     </button>
 
-                    <button type="button" onClick={onPauseSession}>
-                        PAUSAR
+                    <button
+                        className={`session-button ${sessionPaused ? "session-button-resume" : ""
+                            }`}
+                        type="button"
+                        onClick={onPauseSession}
+                    >
+                        {sessionPaused ? "RETOMAR" : "PAUSAR"}
                     </button>
 
-                    <button type="button" onClick={onFinishSession}>
+                    <button
+                        className="session-button session-button-danger"
+                        type="button"
+                        onClick={onFinishSession}
+                    >
                         ENCERRAR
                     </button>
 
-                    <button type="button" onClick={onExportSession}>
+                    <button
+                        className="session-button session-button-export"
+                        type="button"
+                        onClick={onExportSession}
+                    >
                         EXPORTAR CSV
                     </button>
 
-                    <button type="button" onClick={onClearSession}>
+                    <button
+                        className="session-button session-button-danger"
+                        type="button"
+                        onClick={onClearSession}
+                    >
                         LIMPAR
                     </button>
                 </div>

@@ -448,11 +448,15 @@ function App() {
         </div>
         <div className="header-actions">
           <button
-            className="display-button"
+            className={`display-button ${displayMode ? "active" : ""}`}
             type="button"
-            onClick={() => setDisplayMode((value) => !value)}
+            aria-pressed={displayMode}
+            onClick={() => {
+              setDisplayMode((value) => !value);
+              setSettingsOpen(false);
+            }}
           >
-            ▣ DISPLAY
+            {displayMode ? "▣ SAIR DISPLAY" : "▣ DISPLAY"}
           </button>
           <button
             className="fullscreen-button"
@@ -502,6 +506,7 @@ function App() {
         sessionNumber={sessionNumber}
         sessionElapsed={formatSessionDuration(sessionElapsed)}
         sessionTelemetry={sessionTelemetry}
+        sessionPaused={sessionPaused}
         channels={CHANNEL_LIST}
         selectedChannel={selectedChannel}
         selectedDefinition={selectedDefinition}
